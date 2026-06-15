@@ -188,9 +188,9 @@ button:disabled:hover {
 .loading[hidden] { display: none; }
 
 .start-screen {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 4;
+  z-index: 10;
   display: grid;
   place-content: center;
   justify-items: center;
@@ -224,34 +224,15 @@ button:disabled:hover {
   font-size: 13px;
 }
 
-.start-controls {
+.start-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  width: min(560px, calc(100vw - 40px));
-  margin: 30px 0 18px;
-  border-top: 3px solid var(--white);
-  border-bottom: 3px solid var(--white);
-}
-
-.start-controls p {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 0;
-  padding: 10px 12px;
-  font-size: 10px;
-}
-
-.start-controls p:nth-child(even) { border-left: 3px solid var(--white); }
-.start-controls p:nth-child(n + 3) { border-top: 3px solid var(--white); }
-
-.start-controls b {
-  color: var(--red);
-  letter-spacing: .1em;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: min(440px, calc(100vw - 40px));
+  margin-top: 34px;
 }
 
 #start-battle {
-  width: min(560px, calc(100vw - 40px));
   background: var(--red);
 }
 
@@ -260,17 +241,83 @@ button:disabled:hover {
   color: var(--black);
 }
 
+.controls-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 11;
+  width: min(500px, calc(100vw - 32px));
+  padding: 24px;
+  border: 4px solid var(--white);
+  background: var(--black);
+  color: var(--white);
+  text-align: left;
+  transform: translate(-50%, -50%);
+}
+
+.controls-dialog[hidden] { display: none; }
+
+.controls-kicker {
+  margin: 0 0 5px;
+  color: var(--red);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+
+.controls-dialog h3 {
+  margin: 0 0 18px;
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.controls-dialog dl { margin: 0 0 20px; }
+
+.controls-dialog dl div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 2px solid var(--white);
+}
+
+.controls-dialog dl div:last-child {
+  border-bottom: 2px solid var(--white);
+}
+
+.controls-dialog dt {
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.controls-dialog dd {
+  margin: 0;
+  font-size: 11px;
+}
+
+#close-controls { width: 100%; }
+
 .commander-panel {
   position: absolute;
   left: 14px;
   bottom: 14px;
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  width: 360px;
-  min-height: 128px;
+  z-index: 2;
+  width: min(540px, calc(100vw - 28px));
+  max-height: min(440px, calc(100% - 28px));
+  overflow-y: auto;
   border: 3px solid var(--white);
   background: var(--black);
   color: var(--white);
+}
+
+.commander-summary {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  min-height: 128px;
+  border-bottom: 3px solid var(--white);
 }
 
 .commander-portrait {
@@ -351,6 +398,127 @@ button:disabled:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.selection-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 3px solid var(--white);
+}
+
+.selection-actions button,
+.formation-select {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.selection-actions button.is-selected,
+.formation-select.is-selected {
+  background: var(--red);
+  color: var(--white);
+}
+
+.formation-panel {
+  display: grid;
+}
+
+.role-group + .role-group {
+  border-top: 3px solid var(--white);
+}
+
+.role-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 7px 9px;
+  color: var(--red);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.formation-row {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  border-top: 2px solid var(--white);
+}
+
+.formation-select {
+  align-self: stretch;
+  border: 0;
+  border-right: 2px solid var(--white);
+}
+
+.formation-units {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 7px;
+}
+
+.unit-card {
+  position: relative;
+  flex: 0 0 58px;
+  width: 58px;
+  min-height: 70px;
+  padding: 3px;
+  border: 2px solid var(--white);
+  background: var(--black);
+}
+
+.unit-card.is-selected {
+  border-color: var(--red);
+  background: var(--red);
+}
+
+.unit-card.is-destroyed::after {
+  position: absolute;
+  inset: 3px;
+  display: grid;
+  place-items: center;
+  background: var(--black);
+  color: var(--red);
+  content: "X";
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.unit-card img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 3px;
+  object-fit: contain;
+}
+
+.unit-card-hp {
+  display: block;
+  height: 6px;
+  border: 1px solid var(--white);
+  background: var(--black);
+}
+
+.unit-card-hp i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--white);
+}
+
+.selection-box {
+  position: absolute;
+  z-index: 4;
+  border: 2px solid var(--white);
+  background: transparent;
+  pointer-events: none;
+}
+
+.selection-box[hidden] { display: none; }
 
 .battle-result {
   position: absolute;
@@ -487,25 +655,27 @@ button:disabled:hover {
   .controls { grid-column: 2; grid-row: 1; }
   .start-screen { padding: 16px; }
   .start-screen h2 { font-size: 52px; }
-  .start-controls {
+  .start-actions {
     grid-template-columns: 1fr;
     width: min(360px, calc(100vw - 32px));
-    margin: 22px 0 14px;
+    margin-top: 26px;
   }
-  .start-controls p:nth-child(even) { border-left: 0; }
-  .start-controls p + p { border-top: 2px solid var(--white); }
-  #start-battle { width: min(360px, calc(100vw - 32px)); }
+  .controls-dialog { padding: 18px; }
+  .controls-dialog dl div { grid-template-columns: 90px 1fr; }
   .commander-panel {
     left: 8px;
     bottom: 8px;
-    grid-template-columns: 72px 1fr;
-    width: min(310px, calc(100vw - 16px));
-    min-height: 98px;
+    width: min(420px, calc(100vw - 16px));
+    max-height: min(390px, calc(100% - 16px));
   }
+  .commander-summary { grid-template-columns: 72px 1fr; min-height: 98px; }
   .commander-portrait { width: 72px; min-height: 92px; }
   .commander-info { gap: 3px; padding: 7px 9px; }
   .commander-name { font-size: 19px; }
   .force-status dd { font-size: 14px; }
+  .selection-actions { gap: 4px; padding: 6px; }
+  .selection-actions button { padding: 0 4px; font-size: 8px; }
+  .formation-row { grid-template-columns: 82px minmax(0, 1fr); }
   .battle-result { padding: 18px; }
   .battle-result h2 { font-size: 36px; }
   .result-stats { margin: 18px 0 14px; }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#000000">
   <title>Vahren Web Edition - Demo</title>
-  <link rel="stylesheet" href="./styles.css?v=5">
+  <link rel="stylesheet" href="./styles.css?v=7">
 </head>
 <body>
   <main class="game-shell">
@@ -15,9 +15,9 @@
         <h1>DEMO</h1>
       </div>
       <div class="battle-status" aria-live="polite">
-        <span class="team-count ally"><b id="ally-count">3</b> ALLIES</span>
+        <span class="team-count ally"><b id="ally-count">5</b> ALLIES</span>
         <span id="battle-message">ENGAGED</span>
-        <span class="team-count enemy"><b id="enemy-count">3</b> ENEMIES</span>
+        <span class="team-count enemy"><b id="enemy-count">4</b> ENEMIES</span>
       </div>
       <div class="controls">
         <button id="toggle-pause" type="button" aria-pressed="false">PAUSE</button>
@@ -32,32 +32,58 @@
         <p class="start-kicker">VAHREN WEB EDITION</p>
         <h2 id="start-title">EISENHERZ</h2>
         <p class="start-edition">DEMO</p>
-        <div class="start-controls" aria-label="操作方法">
-          <p><b>CAMERA</b><span>画面端へカーソルを移動</span></p>
-          <p><b>ZOOM</b><span>ホイール / ピンチ</span></p>
-          <p><b>PAUSE</b><span>SPACE</span></p>
-          <p><b>RESTART</b><span>ヘッダーのRESTART</span></p>
+        <div class="start-actions">
+          <button id="start-battle" type="button">START BATTLE</button>
+          <button id="show-controls" type="button">CONTROLS</button>
         </div>
-        <button id="start-battle" type="button">START BATTLE</button>
-      </section>
-      <aside class="commander-panel" aria-label="Commander and allied unit status">
-        <img class="commander-portrait" src="./assets/character/char1.webp" alt="Allied commander">
-        <div class="commander-info">
-          <p class="panel-kicker">COMMANDER</p>
-          <strong class="commander-name">ELISE</strong>
-          <dl class="force-status">
-            <div>
-              <dt>UNITS</dt>
-              <dd><span id="panel-unit-count">3</span> / 3</dd>
-            </div>
-            <div>
-              <dt>STRENGTH</dt>
-              <dd><span id="panel-strength">100</span>%</dd>
-            </div>
+        <section
+          id="controls-dialog"
+          class="controls-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="controls-title"
+          hidden
+        >
+          <p class="controls-kicker">HOW TO PLAY</p>
+          <h3 id="controls-title">CONTROLS</h3>
+          <dl>
+            <div><dt>SELECT</dt><dd>ユニットを左クリック</dd></div>
+            <div><dt>BOX SELECT</dt><dd>左ドラッグで範囲選択</dd></div>
+            <div><dt>CAMERA</dt><dd>カーソルを画面端へ移動</dd></div>
+            <div><dt>ZOOM</dt><dd>ホイール / ピンチ</dd></div>
+            <div><dt>PAUSE</dt><dd>SPACEキー</dd></div>
+            <div><dt>RESTART</dt><dd>ヘッダーのRESTART</dd></div>
           </dl>
-          <p class="panel-status">STATUS <b id="panel-status">ADVANCING</b></p>
+          <button id="close-controls" type="button">CLOSE</button>
+        </section>
+      </section>
+      <aside class="commander-panel" aria-label="Commander and allied unit selection">
+        <div class="commander-summary">
+          <img class="commander-portrait" src="./assets/character/char1.webp" alt="Allied commander">
+          <div class="commander-info">
+            <p class="panel-kicker">COMMANDER</p>
+            <strong class="commander-name">ELISE</strong>
+            <dl class="force-status">
+              <div>
+                <dt>UNITS</dt>
+                <dd><span id="panel-unit-count">5</span> / 5</dd>
+              </div>
+              <div>
+                <dt>STRENGTH</dt>
+                <dd><span id="panel-strength">100</span>%</dd>
+              </div>
+            </dl>
+            <p class="panel-status">STATUS <b id="panel-status">ADVANCING</b></p>
+          </div>
         </div>
+        <div class="selection-actions" aria-label="部隊選択">
+          <button type="button" data-select-scope="all">ALL UNITS</button>
+          <button type="button" data-select-role="frontline">FRONTLINE</button>
+          <button type="button" data-select-role="rearGuard">REAR GUARD</button>
+        </div>
+        <div id="formation-panel" class="formation-panel"></div>
       </aside>
+      <div id="selection-box" class="selection-box" hidden></div>
       <section id="battle-result" class="battle-result" aria-live="assertive" hidden>
         <p class="result-kicker">BATTLE RESULT</p>
         <h2 id="result-title">ALLIED VICTORY</h2>
@@ -69,14 +95,14 @@
         <button id="result-restart" type="button">RESTART BATTLE</button>
       </section>
       <div class="legend">
-        <span><i class="ally-dot"></i>味方戦車</span>
+        <span><i class="ally-dot"></i>味方部隊</span>
         <span><i class="enemy-dot"></i>敵戦車</span>
-        <span>表示領域の端: 移動 / ホイール・ピンチ: 拡大縮小</span>
+        <span>左クリック・ドラッグ: 選択 / 画面端: 移動 / ホイール: 拡大縮小</span>
         <span id="zoom-level">60%</span>
       </div>
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=5"></script>
+  <script type="module" src="./src/app.js?v=9"></script>
 </body>
 </html>

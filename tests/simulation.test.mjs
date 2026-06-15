@@ -26,8 +26,107 @@ test("teams start far apart in the lower-left and upper-right", () => {
 
 test("default combat uses long range and fast shells", () => {
   const battle = createBattle();
-  assert.equal(battle.rules.attackRange, 420);
-  assert.equal(battle.rules.shellSpeed, 1000);
+  assert.equal(battle.rules.attackRange, 520);
+  assert.equal(battle.rules.shellSpeed, 1400);
+});
+
+test("allies include two fragile long-range artillery units", () => {
+  const battle = createBattle({ width: 3200, height: 3200 });
+  const artillery = battle.units.filter(unit => unit.type === "artillery");
+  const counts = teamCounts(battle);
+
+  assert.equal(artillery.length, 2);
+  assert.ok(artillery.every(unit => unit.team === "ally"));
+  assert.ok(artillery.every(unit => unit.role === "rearGuard"));
+  assert.ok(artillery.every(unit => unit.formationId === "ally-rear-artillery"));
+  assert.ok(artillery.every(unit => unit.hp === 50 && unit.maxHp === 50));
+  assert.ok(artillery.every(unit => unit.x < 1600 && unit.y > 1600));
+  assert.equal(counts.ally, 5);
+  assert.equal(counts.enemy, 4);
+  assert.equal(battle.rules.artilleryRange, 900);
+  assert.equal(battle.rules.artilleryFireInterval, 4);
+});
+
+test("allied tanks share a frontline formation", () => {
+  const battle = createBattle();
+  const tanks = battle.units.filter(unit => unit.team === "ally" && unit.type === "tank");
+
+  assert.equal(tanks.length, 3);
+  assert.ok(tanks.every(unit => unit.role === "frontline"));
+  assert.ok(tanks.every(unit => unit.formationId === "ally-frontline-tanks"));
+});
+
+test("enemy frontline contains four tanks", () => {
+  const battle = createBattle();
+  const enemies = battle.units.filter(unit => unit.team === "enemy");
+
+  assert.equal(enemies.length, 4);
+  assert.ok(enemies.every(unit => unit.type === "tank"));
+  assert.ok(enemies.every(unit => unit.formationId === "enemy-tanks"));
+});
+
+test("artillery applies area damage only when its arcing shell lands", () => {
+  const battle = createBattle({
+    width: 1000,
+    height: 600,
+    rules: {
+      attackRange: 0,
+      tankSpeed: 0,
+      fireInterval: 100,
+      artilleryRange: 1000,
+      artilleryMinRange: 0,
+      artilleryFireInterval: 100,
+      artilleryFlightTime: 1,
+      artilleryBlastRadius: 120,
+      artilleryDirectDamage: 60,
+      artillerySplashDamage: 30,
+    },
+  });
+  const artillery = battle.units.find(unit => unit.type === "artillery");
+  const enemies = battle.units.filter(unit => unit.team === "enemy").slice(0, 2);
+  battle.units = [artillery, ...enemies];
+  artillery.x = 100;
+  artillery.y = 300;
+  artillery.cooldown = 0;
+  enemies[0].x = 700;
+  enemies[0].y = 300;
+  enemies[1].x = 800;
+  enemies[1].y = 300;
+
+  updateBattle(battle, 0.05);
+  const shell = battle.shells.find(item => item.type === "artillery");
+  assert.ok(shell);
+  assert.ok(shell.progress > 0 && shell.progress < 1);
+  assert.deepEqual(enemies.map(unit => unit.hp), [100, 100]);
+
+  for (let step = 0; step < 17; step += 1) updateBattle(battle, 0.05);
+  assert.deepEqual(enemies.map(unit => unit.hp), [100, 100]);
+
+  for (let step = 0; step < 3; step += 1) updateBattle(battle, 0.05);
+  assert.deepEqual(enemies.map(unit => unit.hp), [70, 70]);
+  assert.ok(battle.explosions.length > 0);
+  assert.equal(battle.shells.some(item => item.type === "artillery"), false);
+});
+
+test("artillery retreats when an enemy enters its minimum range", () => {
+  const battle = createBattle({
+    width: 1000,
+    height: 600,
+    rules: { artilleryMinRange: 250, artillerySpeed: 100 },
+  });
+  const artillery = battle.units.find(unit => unit.type === "artillery");
+  const enemy = battle.units.find(unit => unit.team === "enemy");
+  battle.units = [artillery, enemy];
+  artillery.x = 400;
+  artillery.y = 300;
+  enemy.x = 500;
+  enemy.y = 300;
+  const startX = artillery.x;
+
+  updateBattle(battle, 0.05);
+
+  assert.equal(artillery.state, "retreating");
+  assert.ok(artillery.x < startX);
 });
 
 test("red water terrain reduces movement speed to fifty percent", () => {
@@ -133,6 +232,7 @@ test("units stop advancing when their target enters attack range", () => {
     height: 600,
     rules: { tankSpeed: 100, attackRange: 200, fireInterval: 100 },
   });
+  battle.units = battle.units.filter(unit => unit.type === "tank");
   const ally = battle.units.find(unit => unit.id === "ally-2");
 
   for (let step = 0; step < 600; step += 1) updateBattle(battle, 1 / 60);

@@ -1,15 +1,25 @@
 export const DEFAULT_RULES = Object.freeze({
   maxHp: 100,
   tankSpeed: 90,
-  attackRange: 420,
+  attackRange: 520,
   fireInterval: 1.15,
-  shellSpeed: 1000,
+  shellSpeed: 1400,
   shellDamage: 25,
   hitRadius: 44,
   muzzleOffset: 58,
   rangeTolerance: 2,
   explosionFrameDuration: 0.075,
   explosionFrameCount: 9,
+  artilleryHp: 50,
+  artillerySpeed: 63,
+  artilleryRange: 900,
+  artilleryMinRange: 250,
+  artilleryFireInterval: 4,
+  artilleryFlightTime: 1.35,
+  artilleryArcHeight: 260,
+  artilleryDirectDamage: 60,
+  artillerySplashDamage: 30,
+  artilleryBlastRadius: 120,
 });
 
 export function facingFromDirection(directionX, threshold = 0.05) {
@@ -32,14 +42,45 @@ export function createBattle(options = {}) {
       "ally",
       allyOrigin.x + offset,
       allyOrigin.y + offset,
-      rules
+      rules,
+      {
+        type: "tank",
+        role: "frontline",
+        formationId: "ally-frontline-tanks",
+      }
     ));
+  }
+
+  for (let index = 0; index < 4; index += 1) {
+    const offset = (index - 1.5) * spacing;
     units.push(createUnit(
       `enemy-${index + 1}`,
       "enemy",
       enemyOrigin.x + offset,
       enemyOrigin.y + offset,
-      rules
+      rules,
+      {
+        type: "tank",
+        role: "frontline",
+        formationId: "enemy-tanks",
+      }
+    ));
+  }
+
+  const artilleryOrigin = { x: width * 0.2, y: height * 0.7 };
+  for (let index = 0; index < 2; index += 1) {
+    const offset = (index - 0.5) * 130;
+    units.push(createUnit(
+      `ally-artillery-${index + 1}`,
+      "ally",
+      artilleryOrigin.x + offset,
+      artilleryOrigin.y - offset,
+      rules,
+      {
+        type: "artillery",
+        role: "rearGuard",
+        formationId: "ally-rear-artillery",
+      }
     ));
   }
 
@@ -79,6 +120,11 @@ export function updateBattle(battle, deltaSeconds) {
     const distance = Math.hypot(dx, dy);
     unit.angle = Math.atan2(dy, dx);
     unit.facing = facingFromDirection(dx);
+
+    if (unit.type === "artillery") {
+      updateArtilleryUnit(battle, unit, target, dx, dy, distance, delta);
+      continue;
+    }
 
     if (distance > battle.rules.attackRange + battle.rules.rangeTolerance) {
       unit.state = "moving";
@@ -121,21 +167,74 @@ export function teamCounts(battle) {
   }, { ally: 0, enemy: 0 });
 }
 
-function createUnit(id, team, x, y, rules) {
+function createUnit(id, team, x, y, rules, metadata = {}) {
+  const {
+    type = "tank",
+    role = "frontline",
+    formationId = `${team}-${type}`,
+  } = metadata;
+  const isArtillery = type === "artillery";
   return {
     id,
     team,
+    type,
+    role,
+    formationId,
     x,
     y,
     angle: team === "ally" ? 0 : Math.PI,
     facing: team === "ally" ? "right" : "left",
-    hp: rules.maxHp,
-    maxHp: rules.maxHp,
-    cooldown: 0.25,
+    hp: isArtillery ? rules.artilleryHp : rules.maxHp,
+    maxHp: isArtillery ? rules.artilleryHp : rules.maxHp,
+    cooldown: isArtillery ? 0.8 : 0.25,
     alive: true,
     state: "moving",
     targetId: null,
   };
+}
+
+function updateArtilleryUnit(battle, unit, target, dx, dy, distance, delta) {
+  const terrainMultiplier = movementMultiplierAt(battle, unit.x, unit.y);
+  if (distance < battle.rules.artilleryMinRange) {
+    unit.state = "retreating";
+    moveUnit(
+      unit,
+      -dx,
+      -dy,
+      battle.rules.artillerySpeed * terrainMultiplier * delta,
+      battle
+    );
+    return;
+  }
+
+  if (distance > battle.rules.artilleryRange + battle.rules.rangeTolerance) {
+    unit.state = "moving";
+    moveUnit(
+      unit,
+      dx,
+      dy,
+      Math.min(
+        battle.rules.artillerySpeed * terrainMultiplier * delta,
+        distance - battle.rules.artilleryRange
+      ),
+      battle
+    );
+    return;
+  }
+
+  unit.state = "attacking";
+  if (unit.cooldown <= 0) {
+    fireArtilleryShell(battle, unit, target);
+    unit.cooldown = battle.rules.artilleryFireInterval;
+  }
+}
+
+function moveUnit(unit, dx, dy, travel, battle) {
+  const distance = Math.hypot(dx, dy);
+  if (!distance) return;
+  unit.x += (dx / distance) * travel;
+  unit.y += (dy / distance) * travel;
+  clampUnit(unit, battle);
 }
 
 function nearestEnemy(unit, units) {
@@ -156,6 +255,7 @@ function fireShell(battle, source, target) {
   const angle = Math.atan2(target.y - source.y, target.x - source.x);
   battle.shells.push({
     id: `shell-${battle.nextShellId++}`,
+    type: "direct",
     team: source.team,
     targetId: target.id,
     x: source.x + Math.cos(angle) * battle.rules.muzzleOffset,
@@ -165,10 +265,48 @@ function fireShell(battle, source, target) {
   });
 }
 
+function fireArtilleryShell(battle, source, target) {
+  const impact = artilleryAimPoint(target, battle.units, battle.rules.artilleryBlastRadius);
+  const angle = Math.atan2(impact.y - source.y, impact.x - source.x);
+  battle.shells.push({
+    id: `shell-${battle.nextShellId++}`,
+    type: "artillery",
+    team: source.team,
+    x: source.x,
+    y: source.y,
+    startX: source.x,
+    startY: source.y,
+    targetX: impact.x,
+    targetY: impact.y,
+    angle,
+    age: 0,
+    duration: battle.rules.artilleryFlightTime,
+    arcHeight: battle.rules.artilleryArcHeight,
+    progress: 0,
+    alive: true,
+  });
+}
+
+function artilleryAimPoint(primaryTarget, units, blastRadius) {
+  const nearby = units.filter(unit =>
+    unit.alive &&
+    unit.team === primaryTarget.team &&
+    Math.hypot(unit.x - primaryTarget.x, unit.y - primaryTarget.y) <= blastRadius * 2
+  );
+  return {
+    x: nearby.reduce((sum, unit) => sum + unit.x, 0) / nearby.length,
+    y: nearby.reduce((sum, unit) => sum + unit.y, 0) / nearby.length,
+  };
+}
+
 function updateShells(battle, delta) {
   const unitsById = new Map(battle.units.map(unit => [unit.id, unit]));
   for (const shell of battle.shells) {
     if (!shell.alive) continue;
+    if (shell.type === "artillery") {
+      updateArtilleryShell(battle, shell, delta);
+      continue;
+    }
     const target = unitsById.get(shell.targetId);
     if (!target?.alive) {
       shell.alive = false;
@@ -182,10 +320,7 @@ function updateShells(battle, delta) {
     const travel = battle.rules.shellSpeed * delta;
 
     if (distance <= battle.rules.hitRadius + travel) {
-      target.hp = Math.max(0, target.hp - battle.rules.shellDamage);
-      target.alive = target.hp > 0;
-      target.state = target.alive ? target.state : "destroyed";
-      if (!target.alive) createExplosion(battle, target);
+      damageUnit(battle, target, battle.rules.shellDamage);
       shell.alive = false;
       continue;
     }
@@ -196,11 +331,47 @@ function updateShells(battle, delta) {
   battle.shells = battle.shells.filter(shell => shell.alive);
 }
 
+function updateArtilleryShell(battle, shell, delta) {
+  shell.age += delta;
+  shell.progress = Math.min(1, shell.age / shell.duration);
+  shell.x = shell.startX + (shell.targetX - shell.startX) * shell.progress;
+  shell.y = shell.startY + (shell.targetY - shell.startY) * shell.progress;
+  shell.angle = Math.atan2(shell.targetY - shell.startY, shell.targetX - shell.startX);
+  if (shell.progress < 1) return;
+
+  applyArtilleryImpact(battle, shell);
+  createExplosionAt(battle, shell.targetX, shell.targetY);
+  shell.alive = false;
+}
+
+function applyArtilleryImpact(battle, shell) {
+  for (const unit of battle.units) {
+    if (!unit.alive || unit.team === shell.team) continue;
+    const distance = Math.hypot(unit.x - shell.targetX, unit.y - shell.targetY);
+    if (distance > battle.rules.artilleryBlastRadius) continue;
+    const damage = distance <= battle.rules.hitRadius
+      ? battle.rules.artilleryDirectDamage
+      : battle.rules.artillerySplashDamage;
+    damageUnit(battle, unit, damage);
+  }
+}
+
+function damageUnit(battle, unit, damage) {
+  unit.hp = Math.max(0, unit.hp - damage);
+  unit.alive = unit.hp > 0;
+  unit.state = unit.alive ? unit.state : "destroyed";
+  if (!unit.alive) createExplosion(battle, unit);
+}
+
 function createExplosion(battle, unit) {
+  createExplosionAt(battle, unit.x, unit.y);
+}
+
+function createExplosionAt(battle, x, y) {
   battle.explosions.push({
     id: `explosion-${battle.nextExplosionId++}`,
-    x: unit.x,
-    y: unit.y,
+    x,
+    y,
     age: 0,
   });
 }
