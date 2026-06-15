@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <title>Vahren Web Edition - Demo</title>
+  <link rel="stylesheet" href="./styles.css?v=5">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="top-bar">
+      <div>
+        <p class="eyebrow">EISENHERZ</p>
+        <h1>DEMO</h1>
+      </div>
+      <div class="battle-status" aria-live="polite">
+        <span class="team-count ally"><b id="ally-count">3</b> ALLIES</span>
+        <span id="battle-message">ENGAGED</span>
+        <span class="team-count enemy"><b id="enemy-count">3</b> ENEMIES</span>
+      </div>
+      <div class="controls">
+        <button id="toggle-pause" type="button" aria-pressed="false">PAUSE</button>
+        <button id="restart" type="button">RESTART</button>
+      </div>
+    </header>
+
+    <section class="battlefield-wrap">
+      <canvas id="battlefield" aria-label="自動戦闘マップ"></canvas>
+      <div id="loading" class="loading">マップと部隊を読み込んでいます...</div>
+      <section id="start-screen" class="start-screen" aria-labelledby="start-title" hidden>
+        <p class="start-kicker">VAHREN WEB EDITION</p>
+        <h2 id="start-title">EISENHERZ</h2>
+        <p class="start-edition">DEMO</p>
+        <div class="start-controls" aria-label="操作方法">
+          <p><b>CAMERA</b><span>画面端へカーソルを移動</span></p>
+          <p><b>ZOOM</b><span>ホイール / ピンチ</span></p>
+          <p><b>PAUSE</b><span>SPACE</span></p>
+          <p><b>RESTART</b><span>ヘッダーのRESTART</span></p>
+        </div>
+        <button id="start-battle" type="button">START BATTLE</button>
+      </section>
+      <aside class="commander-panel" aria-label="Commander and allied unit status">
+        <img class="commander-portrait" src="./assets/character/char1.webp" alt="Allied commander">
+        <div class="commander-info">
+          <p class="panel-kicker">COMMANDER</p>
+          <strong class="commander-name">ELISE</strong>
+          <dl class="force-status">
+            <div>
+              <dt>UNITS</dt>
+              <dd><span id="panel-unit-count">3</span> / 3</dd>
+            </div>
+            <div>
+              <dt>STRENGTH</dt>
+              <dd><span id="panel-strength">100</span>%</dd>
+            </div>
+          </dl>
+          <p class="panel-status">STATUS <b id="panel-status">ADVANCING</b></p>
+        </div>
+      </aside>
+      <section id="battle-result" class="battle-result" aria-live="assertive" hidden>
+        <p class="result-kicker">BATTLE RESULT</p>
+        <h2 id="result-title">ALLIED VICTORY</h2>
+        <div class="result-stats">
+          <p><span>ALLIES</span><b id="result-allies">0</b></p>
+          <p><span>ENEMIES</span><b id="result-enemies">0</b></p>
+          <p><span>TIME</span><b id="result-time">00:00</b></p>
+        </div>
+        <button id="result-restart" type="button">RESTART BATTLE</button>
+      </section>
+      <div class="legend">
+        <span><i class="ally-dot"></i>味方戦車</span>
+        <span><i class="enemy-dot"></i>敵戦車</span>
+        <span>表示領域の端: 移動 / ホイール・ピンチ: 拡大縮小</span>
+        <span id="zoom-level">60%</span>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./src/app.js?v=5"></script>
+</body>
+</html>

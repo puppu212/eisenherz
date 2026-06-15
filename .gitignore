@@ -1,0 +1,12 @@
+.DS_Store
+**/.DS_Store
+
+node_modules/
+dist/
+build/
+
+*.log
+*.tmp
+
+# These applications are maintained in their own Git repositories.
+Tools/
