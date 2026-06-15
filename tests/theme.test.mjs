@@ -53,4 +53,5 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /if \(!state\.started\) \{\s*startBattle\(\)/s);
   assert.match(app, /if \(state\.started && !state\.paused\) updateBattle/);
   assert.match(app, /pauseButton\.textContent = state\.paused \? "RESUME" : "PAUSE"/);
+  assert.match(app, /function initialCameraScale\(\) \{\s*return CAMERA_LIMITS\.minScale;/s);
 });

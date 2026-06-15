@@ -379,7 +379,7 @@ function zoomAt(factor, screenX, screenY) {
 }
 
 function initialCameraScale() {
-  return window.innerWidth < 720 ? 0.42 : 0.6;
+  return CAMERA_LIMITS.minScale;
 }
 
 function updateHud() {
