@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#000000">
   <title>Vahren Web Edition - Demo</title>
-  <link rel="stylesheet" href="./styles.css?v=7">
+  <link rel="stylesheet" href="./styles.css?v=9">
 </head>
 <body>
   <main class="game-shell">
@@ -15,9 +15,9 @@
         <h1>DEMO</h1>
       </div>
       <div class="battle-status" aria-live="polite">
-        <span class="team-count ally"><b id="ally-count">5</b> ALLIES</span>
+        <span class="team-count ally"><b id="ally-count">9</b> ALLIES</span>
         <span id="battle-message">ENGAGED</span>
-        <span class="team-count enemy"><b id="enemy-count">4</b> ENEMIES</span>
+        <span class="team-count enemy"><b id="enemy-count">8</b> ENEMIES</span>
       </div>
       <div class="controls">
         <button id="toggle-pause" type="button" aria-pressed="false">PAUSE</button>
@@ -47,8 +47,10 @@
           <p class="controls-kicker">HOW TO PLAY</p>
           <h3 id="controls-title">CONTROLS</h3>
           <dl>
-            <div><dt>SELECT</dt><dd>ユニットを左クリック</dd></div>
-            <div><dt>BOX SELECT</dt><dd>左ドラッグで範囲選択</dd></div>
+            <div><dt>SELECT</dt><dd>マップまたはユニット一覧を左クリック</dd></div>
+            <div><dt>BOX SELECT</dt><dd>マップまたはユニット一覧を左ドラッグ</dd></div>
+            <div><dt>MOVE</dt><dd>右クリックで移動 / 右ドラッグで向き指定</dd></div>
+            <div><dt>FACING</dt><dd>Ctrl + 左ドラッグでも向き指定</dd></div>
             <div><dt>CAMERA</dt><dd>カーソルを画面端へ移動</dd></div>
             <div><dt>ZOOM</dt><dd>ホイール / ピンチ</dd></div>
             <div><dt>PAUSE</dt><dd>SPACEキー</dd></div>
@@ -57,7 +59,7 @@
           <button id="close-controls" type="button">CLOSE</button>
         </section>
       </section>
-      <aside class="commander-panel" aria-label="Commander and allied unit selection">
+      <aside class="commander-panel hud-panel" aria-label="Commander and allied unit controls">
         <div class="commander-summary">
           <img class="commander-portrait" src="./assets/character/char1.webp" alt="Allied commander">
           <div class="commander-info">
@@ -66,7 +68,7 @@
             <dl class="force-status">
               <div>
                 <dt>UNITS</dt>
-                <dd><span id="panel-unit-count">5</span> / 5</dd>
+                <dd><span id="panel-unit-count">9</span> / 9</dd>
               </div>
               <div>
                 <dt>STRENGTH</dt>
@@ -76,12 +78,26 @@
             <p class="panel-status">STATUS <b id="panel-status">ADVANCING</b></p>
           </div>
         </div>
+        <div class="command-mode">
+          <span>CONTROL</span>
+          <div class="command-mode-buttons">
+            <button id="set-control-hold" type="button" aria-pressed="true" tabindex="-1">HOLD</button>
+            <button id="set-control-auto" type="button" aria-pressed="false" tabindex="-1">AUTO</button>
+          </div>
+        </div>
         <div class="selection-actions" aria-label="部隊選択">
           <button type="button" data-select-scope="all">ALL UNITS</button>
           <button type="button" data-select-role="frontline">FRONTLINE</button>
           <button type="button" data-select-role="rearGuard">REAR GUARD</button>
         </div>
+      </aside>
+      <aside class="unit-status-panel hud-panel" aria-label="Allied unit status and selection">
+        <header class="unit-status-heading">
+          <h2>UNIT STATUS</h2>
+          <p>CLICK / DRAG TO SELECT</p>
+        </header>
         <div id="formation-panel" class="formation-panel"></div>
+        <div id="panel-selection-box" class="panel-selection-box" hidden></div>
       </aside>
       <div id="selection-box" class="selection-box" hidden></div>
       <section id="battle-result" class="battle-result" aria-live="assertive" hidden>
@@ -103,6 +119,6 @@
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=9"></script>
+  <script type="module" src="./src/app.js?v=12"></script>
 </body>
 </html>

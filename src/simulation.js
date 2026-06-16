@@ -1,7 +1,7 @@
 export const DEFAULT_RULES = Object.freeze({
   maxHp: 100,
   tankSpeed: 90,
-  attackRange: 520,
+  attackRange: 650,
   fireInterval: 1.15,
   shellSpeed: 1400,
   shellDamage: 25,
@@ -20,6 +20,7 @@ export const DEFAULT_RULES = Object.freeze({
   artilleryDirectDamage: 60,
   artillerySplashDamage: 30,
   artilleryBlastRadius: 120,
+  moveArrivalRadius: 12,
 });
 
 export function facingFromDirection(directionX, threshold = 0.05) {
@@ -31,63 +32,82 @@ export function createBattle(options = {}) {
   const width = options.width ?? 3200;
   const height = options.height ?? 3200;
   const units = [];
-  const spacing = 100;
-  const allyOrigin = { x: width * 0.28, y: height * 0.62 };
-  const enemyOrigin = { x: width * 0.72, y: height * 0.38 };
+  const allyOrigin = { x: width * 0.26, y: height * 0.64 };
+  const enemyOrigin = { x: width * 0.74, y: height * 0.36 };
 
-  for (let index = 0; index < 3; index += 1) {
-    const offset = (index - 1) * spacing;
-    units.push(createUnit(
-      `ally-${index + 1}`,
-      "ally",
-      allyOrigin.x + offset,
-      allyOrigin.y + offset,
-      rules,
-      {
-        type: "tank",
-        role: "frontline",
-        formationId: "ally-frontline-tanks",
-      }
-    ));
-  }
+  createFormation(units, {
+    team: "ally",
+    idPrefix: "ally-tank-a",
+    formationId: "ally-frontline-tanks-a",
+    type: "tank",
+    role: "frontline",
+    count: 3,
+    origin: { x: allyOrigin.x - 120, y: allyOrigin.y - 70 },
+    direction: { x: 1, y: -1 },
+    rules,
+  });
+  createFormation(units, {
+    team: "ally",
+    idPrefix: "ally-tank-b",
+    formationId: "ally-frontline-tanks-b",
+    type: "tank",
+    role: "frontline",
+    count: 2,
+    origin: { x: allyOrigin.x + 160, y: allyOrigin.y - 40 },
+    direction: { x: 1, y: -1 },
+    rules,
+  });
+  createFormation(units, {
+    team: "ally",
+    idPrefix: "ally-artillery-a",
+    formationId: "ally-rear-artillery-a",
+    type: "artillery",
+    role: "rearGuard",
+    count: 2,
+    origin: { x: allyOrigin.x - 220, y: allyOrigin.y + 210 },
+    direction: { x: 1, y: -1 },
+    rules,
+  });
+  createFormation(units, {
+    team: "ally",
+    idPrefix: "ally-artillery-b",
+    formationId: "ally-rear-artillery-b",
+    type: "artillery",
+    role: "rearGuard",
+    count: 2,
+    origin: { x: allyOrigin.x + 170, y: allyOrigin.y + 250 },
+    direction: { x: 1, y: -1 },
+    rules,
+  });
 
-  for (let index = 0; index < 4; index += 1) {
-    const offset = (index - 1.5) * spacing;
-    units.push(createUnit(
-      `enemy-${index + 1}`,
-      "enemy",
-      enemyOrigin.x + offset,
-      enemyOrigin.y + offset,
-      rules,
-      {
-        type: "tank",
-        role: "frontline",
-        formationId: "enemy-tanks",
-      }
-    ));
-  }
-
-  const artilleryOrigin = { x: width * 0.2, y: height * 0.7 };
-  for (let index = 0; index < 2; index += 1) {
-    const offset = (index - 0.5) * 130;
-    units.push(createUnit(
-      `ally-artillery-${index + 1}`,
-      "ally",
-      artilleryOrigin.x + offset,
-      artilleryOrigin.y - offset,
-      rules,
-      {
-        type: "artillery",
-        role: "rearGuard",
-        formationId: "ally-rear-artillery",
-      }
-    ));
-  }
+  createFormation(units, {
+    team: "enemy",
+    idPrefix: "enemy-tank-a",
+    formationId: "enemy-frontline-tanks-a",
+    type: "tank",
+    role: "frontline",
+    count: 4,
+    origin: { x: enemyOrigin.x - 160, y: enemyOrigin.y - 40 },
+    direction: { x: -1, y: 1 },
+    rules,
+  });
+  createFormation(units, {
+    team: "enemy",
+    idPrefix: "enemy-tank-b",
+    formationId: "enemy-frontline-tanks-b",
+    type: "tank",
+    role: "frontline",
+    count: 4,
+    origin: { x: enemyOrigin.x + 180, y: enemyOrigin.y + 20 },
+    direction: { x: -1, y: 1 },
+    rules,
+  });
 
   return {
     width,
     height,
     rules,
+    allyControlMode: options.allyControlMode ?? "hold",
     terrainMovement: options.terrainMovement ?? null,
     units,
     shells: [],
@@ -113,15 +133,23 @@ export function updateBattle(battle, deltaSeconds) {
     unit.cooldown = Math.max(0, unit.cooldown - delta);
     const target = nearestEnemy(unit, battle.units);
     unit.targetId = target?.id ?? null;
-    if (!target) continue;
+    if (!target) {
+      updateManualMove(battle, unit, delta);
+      continue;
+    }
 
     const dx = target.x - unit.x;
     const dy = target.y - unit.y;
     const distance = Math.hypot(dx, dy);
-    unit.angle = Math.atan2(dy, dx);
-    unit.facing = facingFromDirection(dx);
+
+    if (unit.team === "ally" && battle.allyControlMode !== "auto") {
+      updateHeldUnit(battle, unit, target, dx, dy, distance, delta);
+      continue;
+    }
 
     if (unit.type === "artillery") {
+      unit.angle = Math.atan2(dy, dx);
+      unit.facing = facingFromDirection(dx);
       updateArtilleryUnit(battle, unit, target, dx, dy, distance, delta);
       continue;
     }
@@ -137,6 +165,8 @@ export function updateBattle(battle, deltaSeconds) {
       unit.y += (dy / distance) * travel;
       clampUnit(unit, battle);
     } else {
+      unit.angle = Math.atan2(dy, dx);
+      unit.facing = facingFromDirection(dx);
       unit.state = "attacking";
       if (unit.cooldown <= 0) {
         fireShell(battle, unit, target);
@@ -149,6 +179,19 @@ export function updateBattle(battle, deltaSeconds) {
   removeDestroyedUnitsFromTargets(battle);
   battle.winner = determineWinner(battle.units);
   return battle;
+}
+
+export function setAllyControlMode(battle, mode) {
+  battle.allyControlMode = mode === "auto" ? "auto" : "hold";
+}
+
+export function issueMoveOrder(battle, unitDestinations) {
+  for (const { unitId, x, y, angle = 0 } of unitDestinations) {
+    const unit = battle.units.find(candidate => candidate.id === unitId && candidate.alive);
+    if (!unit || unit.team !== "ally") continue;
+    unit.command = { type: "move", x, y, angle };
+    unit.state = "moving";
+  }
 }
 
 export function movementMultiplierAt(battle, x, y) {
@@ -190,7 +233,89 @@ function createUnit(id, team, x, y, rules, metadata = {}) {
     alive: true,
     state: "moving",
     targetId: null,
+    command: null,
   };
+}
+
+function createFormation(units, options) {
+  const lateral = normalize({ x: options.direction.y, y: -options.direction.x });
+  const spacing = options.type === "artillery" ? 120 : 96;
+  const centerOffset = ((options.count - 1) * spacing) / 2;
+  for (let index = 0; index < options.count; index += 1) {
+    const offset = index * spacing - centerOffset;
+    units.push(createUnit(
+      `${options.idPrefix}-${index + 1}`,
+      options.team,
+      options.origin.x + lateral.x * offset,
+      options.origin.y + lateral.y * offset,
+      options.rules,
+      {
+        type: options.type,
+        role: options.role,
+        formationId: options.formationId,
+      }
+    ));
+  }
+}
+
+function normalize(vector) {
+  const length = Math.hypot(vector.x, vector.y) || 1;
+  return { x: vector.x / length, y: vector.y / length };
+}
+
+function updateHeldUnit(battle, unit, target, dx, dy, distance, delta) {
+  const moved = updateManualMove(battle, unit, delta);
+  const attackRange = unit.type === "artillery"
+    ? battle.rules.artilleryRange
+    : battle.rules.attackRange;
+  const minRange = unit.type === "artillery"
+    ? battle.rules.artilleryMinRange
+    : 0;
+  if (
+    distance <= attackRange + battle.rules.rangeTolerance &&
+    distance >= minRange
+  ) {
+    unit.angle = Math.atan2(dy, dx);
+    unit.facing = facingFromDirection(dx);
+    unit.state = "attacking";
+    if (unit.cooldown <= 0) {
+      if (unit.type === "artillery") {
+        fireArtilleryShell(battle, unit, target);
+        unit.cooldown = battle.rules.artilleryFireInterval;
+      } else {
+        fireShell(battle, unit, target);
+        unit.cooldown = battle.rules.fireInterval;
+      }
+    }
+  } else if (!moved) {
+    unit.state = "holding";
+  }
+}
+
+function updateManualMove(battle, unit, delta) {
+  const command = unit.command;
+  if (!command || command.type !== "move") return false;
+  const dx = command.x - unit.x;
+  const dy = command.y - unit.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= battle.rules.moveArrivalRadius) {
+    unit.x = command.x;
+    unit.y = command.y;
+    unit.angle = command.angle;
+    unit.facing = facingFromDirection(Math.cos(command.angle));
+    unit.command = null;
+    unit.state = "holding";
+    return false;
+  }
+  const terrainMultiplier = movementMultiplierAt(battle, unit.x, unit.y);
+  const baseSpeed = unit.type === "artillery"
+    ? battle.rules.artillerySpeed
+    : battle.rules.tankSpeed;
+  moveUnit(unit, dx, dy, Math.min(baseSpeed * terrainMultiplier * delta, distance), battle);
+  unit.angle = Math.atan2(dy, dx);
+  unit.facing = facingFromDirection(dx);
+  unit.state = "moving";
+  return true;
 }
 
 function updateArtilleryUnit(battle, unit, target, dx, dy, distance, delta) {

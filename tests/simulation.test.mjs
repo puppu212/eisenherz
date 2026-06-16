@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   createBattle,
   facingFromDirection,
+  issueMoveOrder,
   movementMultiplierAt,
+  setAllyControlMode,
   teamCounts,
   updateBattle,
 } from "../src/simulation.js";
@@ -26,7 +28,7 @@ test("teams start far apart in the lower-left and upper-right", () => {
 
 test("default combat uses long range and fast shells", () => {
   const battle = createBattle();
-  assert.equal(battle.rules.attackRange, 520);
+  assert.equal(battle.rules.attackRange, 650);
   assert.equal(battle.rules.shellSpeed, 1400);
 });
 
@@ -35,34 +37,35 @@ test("allies include two fragile long-range artillery units", () => {
   const artillery = battle.units.filter(unit => unit.type === "artillery");
   const counts = teamCounts(battle);
 
-  assert.equal(artillery.length, 2);
+  assert.equal(artillery.length, 4);
   assert.ok(artillery.every(unit => unit.team === "ally"));
   assert.ok(artillery.every(unit => unit.role === "rearGuard"));
-  assert.ok(artillery.every(unit => unit.formationId === "ally-rear-artillery"));
+  assert.equal(new Set(artillery.map(unit => unit.formationId)).size, 2);
   assert.ok(artillery.every(unit => unit.hp === 50 && unit.maxHp === 50));
   assert.ok(artillery.every(unit => unit.x < 1600 && unit.y > 1600));
-  assert.equal(counts.ally, 5);
-  assert.equal(counts.enemy, 4);
+  assert.equal(counts.ally, 9);
+  assert.equal(counts.enemy, 8);
   assert.equal(battle.rules.artilleryRange, 900);
   assert.equal(battle.rules.artilleryFireInterval, 4);
+  assert.equal(battle.allyControlMode, "hold");
 });
 
-test("allied tanks share a frontline formation", () => {
+test("allied tanks are split into frontline formations", () => {
   const battle = createBattle();
   const tanks = battle.units.filter(unit => unit.team === "ally" && unit.type === "tank");
 
-  assert.equal(tanks.length, 3);
+  assert.equal(tanks.length, 5);
   assert.ok(tanks.every(unit => unit.role === "frontline"));
-  assert.ok(tanks.every(unit => unit.formationId === "ally-frontline-tanks"));
+  assert.equal(new Set(tanks.map(unit => unit.formationId)).size, 2);
 });
 
-test("enemy frontline contains four tanks", () => {
+test("enemy frontline contains enough tanks to contest the enlarged force", () => {
   const battle = createBattle();
   const enemies = battle.units.filter(unit => unit.team === "enemy");
 
-  assert.equal(enemies.length, 4);
+  assert.equal(enemies.length, 8);
   assert.ok(enemies.every(unit => unit.type === "tank"));
-  assert.ok(enemies.every(unit => unit.formationId === "enemy-tanks"));
+  assert.equal(new Set(enemies.map(unit => unit.formationId)).size, 2);
 });
 
 test("artillery applies area damage only when its arcing shell lands", () => {
@@ -112,6 +115,7 @@ test("artillery retreats when an enemy enters its minimum range", () => {
   const battle = createBattle({
     width: 1000,
     height: 600,
+    allyControlMode: "auto",
     rules: { artilleryMinRange: 250, artillerySpeed: 100 },
   });
   const artillery = battle.units.find(unit => unit.type === "artillery");
@@ -139,16 +143,18 @@ test("red water terrain reduces movement speed to fifty percent", () => {
   const normal = createBattle({
     width: 1000,
     height: 1000,
+    allyControlMode: "auto",
     rules: { attackRange: 0, tankSpeed: 100 },
   });
   const water = createBattle({
     width: 1000,
     height: 1000,
+    allyControlMode: "auto",
     terrainMovement,
     rules: { attackRange: 0, tankSpeed: 100 },
   });
-  const normalUnit = normal.units.find(unit => unit.id === "ally-2");
-  const waterUnit = water.units.find(unit => unit.id === "ally-2");
+  const normalUnit = normal.units.find(unit => unit.id === "ally-tank-a-2");
+  const waterUnit = water.units.find(unit => unit.id === "ally-tank-a-2");
   const normalStart = { x: normalUnit.x, y: normalUnit.y };
   const waterStart = { x: waterUnit.x, y: waterUnit.y };
 
@@ -165,6 +171,7 @@ test("destroyed units create a timed explosion that finishes after victory", () 
   const battle = createBattle({
     width: 800,
     height: 600,
+    allyControlMode: "auto",
     rules: {
       attackRange: 1000,
       fireInterval: 0.01,
@@ -189,9 +196,10 @@ test("shells spawn outside the enlarged unit center", () => {
   const battle = createBattle({
     width: 800,
     height: 600,
+    allyControlMode: "auto",
     rules: { attackRange: 1000, fireInterval: 100, muzzleOffset: 58 },
   });
-  const ally = battle.units.find(unit => unit.id === "ally-2");
+  const ally = battle.units.find(unit => unit.id === "ally-tank-a-2");
   for (let step = 0; step < 20; step += 1) updateBattle(battle, 1 / 60);
   const shell = battle.shells.find(item => item.team === "ally");
   assert.ok(shell);
@@ -202,6 +210,7 @@ test("both teams approach and automatically exchange fire", () => {
   const battle = createBattle({
     width: 1200,
     height: 800,
+    allyControlMode: "auto",
     rules: {
       tankSpeed: 120,
       attackRange: 220,
@@ -210,16 +219,16 @@ test("both teams approach and automatically exchange fire", () => {
       shellDamage: 25,
     },
   });
-  const initialAllyX = battle.units.find(unit => unit.id === "ally-1").x;
+  const initialAllyX = battle.units.find(unit => unit.id === "ally-tank-a-1").x;
 
   for (let step = 0; step < 3000 && !battle.winner; step += 1) {
     updateBattle(battle, 1 / 60);
   }
 
-  const movedAlly = battle.units.find(unit => unit.id === "ally-1");
+  const movedAlly = battle.units.find(unit => unit.id === "ally-tank-a-1");
   assert.ok(movedAlly.x > initialAllyX);
   assert.equal(movedAlly.facing, "right");
-  assert.equal(battle.units.find(unit => unit.id === "enemy-1").facing, "left");
+  assert.equal(battle.units.find(unit => unit.id === "enemy-tank-a-1").facing, "left");
   assert.ok(battle.units.some(unit => unit.hp < unit.maxHp));
   assert.ok(battle.winner);
   const counts = teamCounts(battle);
@@ -230,10 +239,11 @@ test("units stop advancing when their target enters attack range", () => {
   const battle = createBattle({
     width: 1000,
     height: 600,
+    allyControlMode: "auto",
     rules: { tankSpeed: 100, attackRange: 200, fireInterval: 100 },
   });
   battle.units = battle.units.filter(unit => unit.type === "tank");
-  const ally = battle.units.find(unit => unit.id === "ally-2");
+  const ally = battle.units.find(unit => unit.id === "ally-tank-a-2");
 
   for (let step = 0; step < 600; step += 1) updateBattle(battle, 1 / 60);
 
@@ -244,4 +254,30 @@ test("units stop advancing when their target enters attack range", () => {
     battle.rules.attackRange + battle.rules.rangeTolerance + 0.01
   );
   assert.equal(ally.state, "attacking");
+});
+
+test("allied units hold position by default until ordered", () => {
+  const battle = createBattle({ width: 1200, height: 800 });
+  const ally = battle.units.find(unit => unit.id === "ally-tank-a-2");
+  const start = { x: ally.x, y: ally.y };
+
+  updateBattle(battle, 0.05);
+
+  assert.equal(battle.allyControlMode, "hold");
+  assert.deepEqual({ x: ally.x, y: ally.y }, start);
+  assert.ok(["holding", "attacking"].includes(ally.state));
+});
+
+test("manual move orders move held allies toward assigned destinations", () => {
+  const battle = createBattle({ width: 1200, height: 800 });
+  const ally = battle.units.find(unit => unit.id === "ally-tank-a-2");
+  const startX = ally.x;
+
+  issueMoveOrder(battle, [{ unitId: ally.id, x: ally.x + 120, y: ally.y, angle: 0 }]);
+  updateBattle(battle, 0.5);
+
+  assert.ok(ally.x > startX);
+  assert.equal(ally.command?.type, "move");
+  setAllyControlMode(battle, "auto");
+  assert.equal(battle.allyControlMode, "auto");
 });

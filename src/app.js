@@ -1,4 +1,10 @@
-import { createBattle, teamCounts, updateBattle } from "./simulation.js?v=7";
+import {
+  createBattle,
+  issueMoveOrder,
+  setAllyControlMode,
+  teamCounts,
+  updateBattle,
+} from "./simulation.js?v=8";
 import {
   CAMERA_LIMITS,
   cameraTransform,
@@ -17,6 +23,8 @@ const enemyCount = document.getElementById("enemy-count");
 const battleMessage = document.getElementById("battle-message");
 const pauseButton = document.getElementById("toggle-pause");
 const restartButton = document.getElementById("restart");
+const controlHoldButton = document.getElementById("set-control-hold");
+const controlAutoButton = document.getElementById("set-control-auto");
 const zoomLevel = document.getElementById("zoom-level");
 const panelUnitCount = document.getElementById("panel-unit-count");
 const panelStrength = document.getElementById("panel-strength");
@@ -33,8 +41,10 @@ const showControlsButton = document.getElementById("show-controls");
 const closeControlsButton = document.getElementById("close-controls");
 const controlsDialog = document.getElementById("controls-dialog");
 const commanderPanel = document.querySelector(".commander-panel");
+const unitStatusPanel = document.querySelector(".unit-status-panel");
 const formationPanel = document.getElementById("formation-panel");
 const selectionBox = document.getElementById("selection-box");
+const panelSelectionBox = document.getElementById("panel-selection-box");
 
 const ROLE_LABELS = {
   frontline: "FRONTLINE",
@@ -62,6 +72,9 @@ const EXPLOSION_SIZE = 176;
 const EXPLOSION_HALF_SIZE = EXPLOSION_SIZE / 2;
 const EXPLOSION_FRAME_COUNT = 9;
 const HP_BAR_WIDTH = 96;
+const FORMATION_UNIT_SPACING = 92;
+const FORMATION_BLOCK_GAP = 96;
+const FORMATION_ROLE_GAP = 190;
 
 const state = {
   map: null,
@@ -80,6 +93,11 @@ const state = {
   unitCards: new Map(),
   formationButtons: new Map(),
   selectionDrag: null,
+  panelSelectionDrag: null,
+  externalPanelSelectionDrag: null,
+  commandDrag: null,
+  hudPanelDrag: null,
+  suppressPanelClick: false,
 };
 
 boot().catch(error => {
@@ -113,6 +131,16 @@ async function boot() {
   window.addEventListener("pointerout", stopEdgeScrollOutsideWindow);
   window.addEventListener("blur", clearEdgeScroll);
   pauseButton.addEventListener("click", togglePause);
+  controlHoldButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
+  controlAutoButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
+  controlHoldButton.addEventListener("click", event => {
+    event.stopPropagation();
+    setControlMode("hold");
+  });
+  controlAutoButton.addEventListener("click", event => {
+    event.stopPropagation();
+    setControlMode("auto");
+  });
   restartButton.addEventListener("click", () => {
     resetBattle({ waitForStart: !state.started });
   });
@@ -121,7 +149,22 @@ async function boot() {
   showControlsButton.addEventListener("click", showControls);
   closeControlsButton.addEventListener("click", hideControls);
   commanderPanel.addEventListener("click", handlePanelSelection);
+  commanderPanel.addEventListener("pointerdown", startHudPanelDrag);
+  unitStatusPanel.addEventListener("click", handlePanelSelection);
+  unitStatusPanel.addEventListener("pointerdown", startHudPanelDrag);
+  window.addEventListener("pointerdown", startExternalPanelSelection);
+  window.addEventListener("pointermove", updateExternalPanelSelection);
+  window.addEventListener("pointerup", finishExternalPanelSelection);
+  window.addEventListener("pointercancel", cancelExternalPanelSelection);
+  window.addEventListener("pointermove", updateHudPanelDrag);
+  window.addEventListener("pointerup", finishHudPanelDrag);
+  window.addEventListener("pointercancel", cancelHudPanelDrag);
   window.addEventListener("keydown", handleKeyboard);
+  canvas.addEventListener("contextmenu", event => event.preventDefault());
+  canvas.addEventListener("pointerdown", startCommandDrag);
+  canvas.addEventListener("pointermove", updateCommandDrag);
+  canvas.addEventListener("pointerup", finishCommandDrag);
+  canvas.addEventListener("pointercancel", cancelCommandDrag);
   canvas.addEventListener("pointerdown", startMapSelection);
   canvas.addEventListener("pointermove", updateMapSelection);
   canvas.addEventListener("pointerup", finishMapSelection);
@@ -147,12 +190,19 @@ function resetBattle(options = {}) {
   state.paused = false;
   state.selectedUnitIds.clear();
   state.selectionDrag = null;
+  state.panelSelectionDrag = null;
+  state.externalPanelSelectionDrag = null;
+  state.commandDrag = null;
+  state.hudPanelDrag = null;
+  state.suppressPanelClick = false;
   battleResult.hidden = true;
   controlsDialog.hidden = true;
   selectionBox.hidden = true;
+  panelSelectionBox.hidden = true;
   startScreen.hidden = state.started;
   buildFormationPanel();
   syncPauseButton();
+  syncControlModeButton();
   battleMessage.textContent = state.started ? "ENGAGED" : "READY";
   updateHud();
   exposeDebugState();
@@ -190,6 +240,27 @@ function syncPauseButton() {
   pauseButton.disabled = !state.started || Boolean(state.battle?.winner);
   pauseButton.classList.toggle("is-active", state.paused);
   pauseButton.setAttribute("aria-pressed", String(state.paused));
+}
+
+function setControlMode(mode) {
+  if (!state.battle) return;
+  setAllyControlMode(state.battle, mode);
+  controlHoldButton.blur();
+  controlAutoButton.blur();
+  syncControlModeButton();
+  updateHud();
+}
+
+function stopPanelDragFromControlButton(event) {
+  event.stopPropagation();
+}
+
+function syncControlModeButton() {
+  const isAuto = state.battle?.allyControlMode === "auto";
+  controlHoldButton.classList.toggle("is-active", !isAuto);
+  controlAutoButton.classList.toggle("is-active", isAuto);
+  controlHoldButton.setAttribute("aria-pressed", String(!isAuto));
+  controlAutoButton.setAttribute("aria-pressed", String(isAuto));
 }
 
 function handleKeyboard(event) {
@@ -236,6 +307,8 @@ function render() {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(state.mapLayer, 0, 0);
   drawBattle();
+  drawActiveMoveGhosts();
+  drawCommandPreview();
   ctx.restore();
 }
 
@@ -246,6 +319,82 @@ function drawBattle() {
   }
   for (const shell of state.battle.shells) drawShell(shell);
   for (const explosion of state.battle.explosions ?? []) drawExplosion(explosion);
+}
+
+function drawCommandPreview() {
+  const drag = state.commandDrag;
+  if (!drag || state.selectedUnitIds.size === 0) return;
+  const angle = commandAngle(drag);
+  const destinations = formationDestinations(drag.startX, drag.startY, angle);
+  if (destinations.length === 0) return;
+
+  ctx.save();
+  ctx.lineJoin = "miter";
+  drawCommandArrow(drag.startX, drag.startY, drag.currentX, drag.currentY, angle);
+  for (const destination of destinations) {
+    drawMoveGhost(destination.x, destination.y, destination.role);
+  }
+  ctx.restore();
+}
+
+function drawActiveMoveGhosts() {
+  const destinations = state.battle.units
+    .filter(unit => unit.alive && unit.team === "ally" && unit.command?.type === "move")
+    .map(unit => ({
+      x: unit.command.x,
+      y: unit.command.y,
+      role: unit.role,
+    }));
+  if (destinations.length === 0) return;
+
+  ctx.save();
+  for (const destination of destinations) {
+    drawMoveGhost(destination.x, destination.y, destination.role);
+  }
+  ctx.restore();
+}
+
+function drawMoveGhost(x, y, role) {
+  ctx.strokeStyle = role === "frontline" ? "#ffffff" : "#db0814";
+  ctx.lineWidth = 5;
+  ctx.strokeRect(x - 24, y - 24, 48, 48);
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - 18, y - 18, 36, 36);
+}
+
+function drawCommandArrow(startX, startY, currentX, currentY, angle) {
+  const length = Math.max(90, Math.hypot(currentX - startX, currentY - startY));
+  const endX = startX + Math.cos(angle) * length;
+  const endY = startY + Math.sin(angle) * length;
+  drawStrokedArrow(startX, startY, endX, endY, 15, "#ffffff");
+  drawStrokedArrow(startX, startY, endX, endY, 8, "#db0814");
+}
+
+function drawStrokedArrow(startX, startY, endX, endY, lineWidth, color) {
+  const angle = Math.atan2(endY - startY, endX - startX);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  const headLength = lineWidth === 15 ? 42 : 34;
+  const headWidth = lineWidth === 15 ? 34 : 24;
+  ctx.beginPath();
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(
+    endX - Math.cos(angle) * headLength + Math.cos(angle + Math.PI / 2) * headWidth,
+    endY - Math.sin(angle) * headLength + Math.sin(angle + Math.PI / 2) * headWidth
+  );
+  ctx.lineTo(
+    endX - Math.cos(angle) * headLength + Math.cos(angle - Math.PI / 2) * headWidth,
+    endY - Math.sin(angle) * headLength + Math.sin(angle - Math.PI / 2) * headWidth
+  );
+  ctx.closePath();
+  ctx.fill();
 }
 
 function drawUnit(unit) {
@@ -414,7 +563,7 @@ function updateEdgeScroll(event) {
     return;
   }
   if (event.target.closest?.(
-    "button, input, select, textarea, a, [role='button'], .commander-panel"
+    "button, input, select, textarea, a, [role='button'], .hud-panel"
   )) {
     clearEdgeScroll();
     return;
@@ -497,6 +646,7 @@ function updateHud() {
   enemyCount.textContent = counts.enemy;
   updateCommanderPanel(counts);
   syncFormationPanel();
+  syncControlModeButton();
   updateBattleResult(counts);
   syncPauseButton();
   if (!state.started) {
@@ -668,6 +818,7 @@ function isEntireGroupSelected(ids) {
 }
 
 function handlePanelSelection(event) {
+  if (state.suppressPanelClick) return;
   const unitButton = event.target.closest("[data-select-unit]");
   const formationButton = event.target.closest("[data-select-formation]");
   const roleButton = event.target.closest("[data-select-role]");
@@ -681,6 +832,222 @@ function handlePanelSelection(event) {
   } else if (allButton) {
     selectBy(() => true, event.shiftKey);
   }
+}
+
+function startPanelSelection(event) {
+  if (event.button !== 0) return;
+  if (event.target.closest("[data-select-formation]")) return;
+  const unitButton = event.target.closest("[data-select-unit]");
+  state.panelSelectionDrag = {
+    pointerId: event.pointerId,
+    unitId: unitButton?.dataset.selectUnit ?? null,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    currentClientX: event.clientX,
+    currentClientY: event.clientY,
+    additive: event.shiftKey,
+    moved: false,
+    captured: true,
+  };
+  clearEdgeScroll();
+  unitStatusPanel.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
+function updatePanelSelection(event) {
+  const drag = state.panelSelectionDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  drag.currentClientX = event.clientX;
+  drag.currentClientY = event.clientY;
+  drag.moved ||= Math.hypot(
+    event.clientX - drag.startClientX,
+    event.clientY - drag.startClientY
+  ) >= 5;
+  if (drag.moved) {
+    updatePanelSelectionBox(drag);
+  }
+}
+
+function finishPanelSelection(event) {
+  const drag = state.panelSelectionDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  drag.currentClientX = event.clientX;
+  drag.currentClientY = event.clientY;
+  if (drag.moved) {
+    const bounds = normalizedBounds(
+      drag.startClientX,
+      drag.startClientY,
+      drag.currentClientX,
+      drag.currentClientY
+    );
+    selectUnitIds(unitCardsInClientBounds(bounds), drag.additive);
+  } else {
+    selectUnitIds(drag.unitId ? [drag.unitId] : [], drag.additive);
+  }
+  state.suppressPanelClick = true;
+  setTimeout(() => {
+    state.suppressPanelClick = false;
+  }, 0);
+  event.preventDefault();
+  cancelPanelSelection(event);
+}
+
+function cancelPanelSelection(event) {
+  if (state.panelSelectionDrag?.captured && event?.pointerId != null) {
+    unitStatusPanel.releasePointerCapture?.(event.pointerId);
+  }
+  state.panelSelectionDrag = null;
+  panelSelectionBox.hidden = true;
+}
+
+function startHudPanelDrag(event) {
+  if (event.button !== 0) return;
+  if (event.target.closest?.(".command-mode button")) return;
+  const panel = event.currentTarget;
+  const rect = panel.getBoundingClientRect();
+  state.hudPanelDrag = {
+    pointerId: event.pointerId,
+    panel,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startLeft: rect.left,
+    startTop: rect.top,
+    moved: false,
+  };
+  panel.setPointerCapture?.(event.pointerId);
+}
+
+function updateHudPanelDrag(event) {
+  const drag = state.hudPanelDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const dx = event.clientX - drag.startClientX;
+  const dy = event.clientY - drag.startClientY;
+  drag.moved ||= Math.hypot(dx, dy) >= 5;
+  if (!drag.moved) return;
+  placeHudPanel(drag.panel, drag.startLeft + dx, drag.startTop + dy);
+  drag.panel.classList.add("is-dragging");
+  event.preventDefault();
+}
+
+function finishHudPanelDrag(event) {
+  const drag = state.hudPanelDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  if (drag.moved) {
+    state.suppressPanelClick = true;
+    setTimeout(() => {
+      state.suppressPanelClick = false;
+    }, 0);
+    event.preventDefault();
+  }
+  cancelHudPanelDrag(event);
+}
+
+function cancelHudPanelDrag(event) {
+  const drag = state.hudPanelDrag;
+  if (!drag) return;
+  drag.panel.classList.remove("is-dragging");
+  if (event?.pointerId != null) drag.panel.releasePointerCapture?.(event.pointerId);
+  state.hudPanelDrag = null;
+}
+
+function placeHudPanel(panel, clientLeft, clientTop) {
+  const parentRect = panel.offsetParent.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const left = Math.max(parentRect.left, Math.min(
+    parentRect.right - panelRect.width,
+    clientLeft
+  ));
+  const top = Math.max(parentRect.top, Math.min(
+    parentRect.bottom - panelRect.height,
+    clientTop
+  ));
+  panel.style.left = `${left - parentRect.left}px`;
+  panel.style.top = `${top - parentRect.top}px`;
+  panel.style.right = "auto";
+  panel.style.bottom = "auto";
+}
+
+function startExternalPanelSelection(event) {
+  if (
+    event.button !== 0 ||
+    !state.started ||
+    state.battle?.winner ||
+    event.target.closest?.(".hud-panel, button, input, select, textarea, a, [role='button']")
+  ) return;
+  state.externalPanelSelectionDrag = {
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    currentClientX: event.clientX,
+    currentClientY: event.clientY,
+    additive: event.shiftKey,
+    moved: false,
+  };
+}
+
+function updateExternalPanelSelection(event) {
+  const drag = state.externalPanelSelectionDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  drag.currentClientX = event.clientX;
+  drag.currentClientY = event.clientY;
+  drag.moved ||= Math.hypot(
+    event.clientX - drag.startClientX,
+    event.clientY - drag.startClientY
+  ) >= 6;
+}
+
+function finishExternalPanelSelection(event) {
+  const drag = state.externalPanelSelectionDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  drag.currentClientX = event.clientX;
+  drag.currentClientY = event.clientY;
+  if (drag.moved) {
+    const bounds = normalizedBounds(
+      drag.startClientX,
+      drag.startClientY,
+      drag.currentClientX,
+      drag.currentClientY
+    );
+    const ids = unitCardsInClientBounds(bounds);
+    if (ids.length > 0) selectUnitIds(ids, drag.additive);
+  }
+  cancelExternalPanelSelection();
+}
+
+function cancelExternalPanelSelection() {
+  state.externalPanelSelectionDrag = null;
+}
+
+function unitCardsInClientBounds(bounds) {
+  const ids = [];
+  for (const [id, entry] of state.unitCards) {
+    if (entry.card.disabled) continue;
+    const rect = entry.card.getBoundingClientRect();
+    if (
+      rect.right >= bounds.left &&
+      rect.left <= bounds.right &&
+      rect.bottom >= bounds.top &&
+      rect.top <= bounds.bottom
+    ) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+function updatePanelSelectionBox(drag) {
+  const panelRect = unitStatusPanel.getBoundingClientRect();
+  const bounds = normalizedBounds(
+    drag.startClientX - panelRect.left,
+    drag.startClientY - panelRect.top,
+    drag.currentClientX - panelRect.left,
+    drag.currentClientY - panelRect.top
+  );
+  panelSelectionBox.hidden = false;
+  panelSelectionBox.style.left = `${bounds.left}px`;
+  panelSelectionBox.style.top = `${bounds.top}px`;
+  panelSelectionBox.style.width = `${bounds.right - bounds.left}px`;
+  panelSelectionBox.style.height = `${bounds.bottom - bounds.top}px`;
 }
 
 function selectBy(predicate, additive = false) {
@@ -709,9 +1076,150 @@ function selectUnitIds(ids, additive = false) {
   exposeDebugState();
 }
 
+function startCommandDrag(event) {
+  if (
+    !state.started ||
+    state.battle?.winner ||
+    !battleResult.hidden ||
+    state.selectedUnitIds.size === 0
+  ) return;
+  const isRightCommand = event.button === 2;
+  const isFacingCommand = event.button === 0 && event.ctrlKey;
+  if (!isRightCommand && !isFacingCommand) return;
+  const point = canvasPoint(event);
+  const world = screenToWorld(point.x, point.y);
+  state.commandDrag = {
+    pointerId: event.pointerId,
+    startX: world.x,
+    startY: world.y,
+    currentX: world.x,
+    currentY: world.y,
+    moved: false,
+  };
+  clearEdgeScroll();
+  canvas.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
+function updateCommandDrag(event) {
+  const drag = state.commandDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const point = canvasPoint(event);
+  const world = screenToWorld(point.x, point.y);
+  drag.currentX = world.x;
+  drag.currentY = world.y;
+  drag.moved ||= Math.hypot(world.x - drag.startX, world.y - drag.startY) >= 12;
+  event.preventDefault();
+}
+
+function finishCommandDrag(event) {
+  const drag = state.commandDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const angle = commandAngle(drag);
+  const destinations = formationDestinations(drag.startX, drag.startY, angle);
+  if (destinations.length > 0) {
+    setAllyControlMode(state.battle, "hold");
+    issueMoveOrder(state.battle, destinations);
+    syncControlModeButton();
+  }
+  cancelCommandDrag(event);
+  event.preventDefault();
+}
+
+function cancelCommandDrag(event) {
+  if (event?.pointerId != null) canvas.releasePointerCapture?.(event.pointerId);
+  state.commandDrag = null;
+}
+
+function commandAngle(drag) {
+  if (drag.moved) return Math.atan2(drag.currentY - drag.startY, drag.currentX - drag.startX);
+  const center = selectedUnitsCenter();
+  if (center) return Math.atan2(drag.startY - center.y, drag.startX - center.x);
+  return 0;
+}
+
+function selectedUnitsCenter() {
+  const units = selectedLivingAllies();
+  if (units.length === 0) return null;
+  return {
+    x: units.reduce((sum, unit) => sum + unit.x, 0) / units.length,
+    y: units.reduce((sum, unit) => sum + unit.y, 0) / units.length,
+  };
+}
+
+function formationDestinations(centerX, centerY, angle) {
+  const units = selectedLivingAllies();
+  if (units.length === 0) return [];
+  const forward = { x: Math.cos(angle), y: Math.sin(angle) };
+  const lateral = { x: -Math.sin(angle), y: Math.cos(angle) };
+  const roleGroups = groupSelectedFormations(units);
+  const destinations = [];
+
+  for (const role of ["frontline", "rearGuard"]) {
+    const formations = roleGroups.get(role);
+    if (!formations?.length) continue;
+    const roleOffset = role === "frontline" ? 0 : -FORMATION_ROLE_GAP;
+    const blockWidths = formations.map(formation =>
+      Math.max(FORMATION_UNIT_SPACING, (formation.units.length - 1) * FORMATION_UNIT_SPACING)
+    );
+    const totalWidth = blockWidths.reduce((sum, width) => sum + width, 0) +
+      Math.max(0, formations.length - 1) * FORMATION_BLOCK_GAP;
+    let cursor = -totalWidth / 2;
+    formations.forEach((formation, formationIndex) => {
+      const blockWidth = blockWidths[formationIndex];
+      const blockCenter = cursor + blockWidth / 2;
+      const unitStart = -((formation.units.length - 1) * FORMATION_UNIT_SPACING) / 2;
+      formation.units.forEach((unit, unitIndex) => {
+        const unitOffset = blockCenter + unitStart + unitIndex * FORMATION_UNIT_SPACING;
+        destinations.push({
+          unitId: unit.id,
+          x: centerX + lateral.x * unitOffset + forward.x * roleOffset,
+          y: centerY + lateral.y * unitOffset + forward.y * roleOffset,
+          angle,
+          role: unit.role,
+          formationId: unit.formationId,
+        });
+      });
+      cursor += blockWidth + FORMATION_BLOCK_GAP;
+    });
+  }
+  return destinations;
+}
+
+function groupSelectedFormations(units) {
+  const roleGroups = new Map();
+  for (const unit of units) {
+    if (!roleGroups.has(unit.role)) roleGroups.set(unit.role, new Map());
+    const formations = roleGroups.get(unit.role);
+    if (!formations.has(unit.formationId)) {
+      formations.set(unit.formationId, {
+        id: unit.formationId,
+        units: [],
+      });
+    }
+    formations.get(unit.formationId).units.push(unit);
+  }
+  const ordered = new Map();
+  for (const role of ["frontline", "rearGuard"]) {
+    const formations = roleGroups.get(role);
+    if (!formations) continue;
+    ordered.set(role, [...formations.values()].sort((a, b) => a.id.localeCompare(b.id)));
+  }
+  return ordered;
+}
+
+function selectedLivingAllies() {
+  return state.battle.units.filter(unit =>
+    unit.team === "ally" &&
+    unit.alive &&
+    state.selectedUnitIds.has(unit.id)
+  );
+}
+
 function startMapSelection(event) {
   if (
     event.button !== 0 ||
+    event.ctrlKey ||
     !state.started ||
     state.battle?.winner ||
     !battleResult.hidden
@@ -723,6 +1231,10 @@ function startMapSelection(event) {
     startY: point.y,
     currentX: point.x,
     currentY: point.y,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    currentClientX: event.clientX,
+    currentClientY: event.clientY,
     additive: event.shiftKey,
     moved: false,
   };
@@ -737,6 +1249,8 @@ function updateMapSelection(event) {
   const point = canvasPoint(event);
   drag.currentX = point.x;
   drag.currentY = point.y;
+  drag.currentClientX = event.clientX;
+  drag.currentClientY = event.clientY;
   drag.moved ||= Math.hypot(point.x - drag.startX, point.y - drag.startY) >= 6;
   if (drag.moved) updateSelectionBox(drag);
 }
@@ -747,9 +1261,20 @@ function finishMapSelection(event) {
   const point = canvasPoint(event);
   drag.currentX = point.x;
   drag.currentY = point.y;
+  drag.currentClientX = event.clientX;
+  drag.currentClientY = event.clientY;
   if (drag.moved) {
     const bounds = normalizedBounds(drag.startX, drag.startY, drag.currentX, drag.currentY);
-    const ids = alliedUnitsInScreenBounds(bounds).map(unit => unit.id);
+    const clientBounds = normalizedBounds(
+      drag.startClientX,
+      drag.startClientY,
+      drag.currentClientX,
+      drag.currentClientY
+    );
+    const ids = [
+      ...alliedUnitsInScreenBounds(bounds).map(unit => unit.id),
+      ...unitCardsInClientBounds(clientBounds),
+    ];
     selectUnitIds(ids, drag.additive);
   } else {
     const unit = alliedUnitAtScreenPoint(point.x, point.y);
@@ -873,6 +1398,7 @@ function exposeDebugState() {
       alive: unit.alive,
       state: unit.state,
       facing: unit.facing,
+      command: unit.command?.type ?? "",
     })) ?? [],
   };
   window.__RTS_DEBUG__ = debugState;
@@ -895,6 +1421,9 @@ function exposeDebugState() {
     debugState.units.reduce((minimum, unit) => Math.min(minimum, unit.hp), 100)
   );
   canvas.dataset.unitStates = [...new Set(debugState.units.map(unit => unit.state))].join(",");
+  canvas.dataset.moveCommands = String(
+    debugState.units.filter(unit => unit.command === "move").length
+  );
   canvas.dataset.cameraX = String(debugState.camera?.centerX ?? "");
   canvas.dataset.cameraY = String(debugState.camera?.centerY ?? "");
   canvas.dataset.cameraScale = String(debugState.camera?.scale ?? "");
