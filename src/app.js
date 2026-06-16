@@ -373,7 +373,6 @@ function drawCommandPreview() {
   if (destinations.length === 0) return;
 
   ctx.save();
-  ctx.lineJoin = "miter";
   drawCommandArrow(drag.startX, drag.startY, drag.currentX, drag.currentY, angle);
   for (const destination of destinations) {
     drawMoveGhost(destination.x, destination.y, destination.role, "preview");
@@ -424,26 +423,25 @@ function drawCommandArrow(startX, startY, currentX, currentY, angle) {
 
 function drawStrokedArrow(startX, startY, endX, endY, lineWidth, color) {
   const angle = Math.atan2(endY - startY, endX - startX);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = lineWidth;
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  ctx.lineTo(endX, endY);
-  ctx.stroke();
-
+  const directionX = Math.cos(angle);
+  const directionY = Math.sin(angle);
+  const normalX = Math.cos(angle + Math.PI / 2);
+  const normalY = Math.sin(angle + Math.PI / 2);
   const headLength = lineWidth === 15 ? 42 : 34;
   const headWidth = lineWidth === 15 ? 34 : 24;
+  const shaftHalfWidth = lineWidth / 2;
+  const neckX = endX - directionX * headLength;
+  const neckY = endY - directionY * headLength;
+
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(endX, endY);
-  ctx.lineTo(
-    endX - Math.cos(angle) * headLength + Math.cos(angle + Math.PI / 2) * headWidth,
-    endY - Math.sin(angle) * headLength + Math.sin(angle + Math.PI / 2) * headWidth
-  );
-  ctx.lineTo(
-    endX - Math.cos(angle) * headLength + Math.cos(angle - Math.PI / 2) * headWidth,
-    endY - Math.sin(angle) * headLength + Math.sin(angle - Math.PI / 2) * headWidth
-  );
+  ctx.moveTo(startX + normalX * shaftHalfWidth, startY + normalY * shaftHalfWidth);
+  ctx.lineTo(neckX + normalX * shaftHalfWidth, neckY + normalY * shaftHalfWidth);
+  ctx.lineTo(neckX + normalX * headWidth, neckY + normalY * headWidth);
+  ctx.lineTo(endX, endY);
+  ctx.lineTo(neckX - normalX * headWidth, neckY - normalY * headWidth);
+  ctx.lineTo(neckX - normalX * shaftHalfWidth, neckY - normalY * shaftHalfWidth);
+  ctx.lineTo(startX - normalX * shaftHalfWidth, startY - normalY * shaftHalfWidth);
   ctx.closePath();
   ctx.fill();
 }

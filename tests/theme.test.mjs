@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=10"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=13"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=14"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
