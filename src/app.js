@@ -4,7 +4,7 @@ import {
   setAllyControlMode,
   teamCounts,
   updateBattle,
-} from "./simulation.js?v=8";
+} from "./simulation.js?v=9";
 import {
   CAMERA_LIMITS,
   cameraTransform,
@@ -26,6 +26,8 @@ const pauseButton = document.getElementById("toggle-pause");
 const restartButton = document.getElementById("restart");
 const controlHoldButton = document.getElementById("set-control-hold");
 const controlAutoButton = document.getElementById("set-control-auto");
+const formationLineButton = document.getElementById("set-formation-line");
+const formationSquareButton = document.getElementById("set-formation-square");
 const zoomLevel = document.getElementById("zoom-level");
 const panelUnitCount = document.getElementById("panel-unit-count");
 const panelStrength = document.getElementById("panel-strength");
@@ -76,6 +78,7 @@ const HP_BAR_WIDTH = 96;
 const FORMATION_UNIT_SPACING = 92;
 const FORMATION_BLOCK_GAP = 96;
 const FORMATION_ROLE_GAP = 190;
+const FORMATION_SQUARE_COLUMNS = 2;
 
 const state = {
   map: null,
@@ -91,6 +94,7 @@ const state = {
   edgeScroll: { x: 0, y: 0 },
   gestureScale: null,
   selectedUnitIds: new Set(),
+  formationStyle: "line",
   unitCards: new Map(),
   formationButtons: new Map(),
   selectionDrag: null,
@@ -138,6 +142,8 @@ async function boot() {
   pauseButton.addEventListener("click", togglePause);
   controlHoldButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   controlAutoButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
+  formationLineButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
+  formationSquareButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   controlHoldButton.addEventListener("click", event => {
     event.stopPropagation();
     setControlMode("hold");
@@ -145,6 +151,14 @@ async function boot() {
   controlAutoButton.addEventListener("click", event => {
     event.stopPropagation();
     setControlMode("auto");
+  });
+  formationLineButton.addEventListener("click", event => {
+    event.stopPropagation();
+    setFormationStyle("line");
+  });
+  formationSquareButton.addEventListener("click", event => {
+    event.stopPropagation();
+    setFormationStyle("square");
   });
   restartButton.addEventListener("click", () => {
     resetBattle({ waitForStart: !state.started });
@@ -208,6 +222,7 @@ function resetBattle(options = {}) {
   buildFormationPanel();
   syncPauseButton();
   syncControlModeButton();
+  syncFormationStyleButton();
   battleMessage.textContent = state.started ? "ENGAGED" : "READY";
   updateHud();
   exposeDebugState();
@@ -270,6 +285,21 @@ function syncControlModeButton() {
   controlAutoButton.classList.toggle("is-active", isAuto);
   controlHoldButton.setAttribute("aria-pressed", String(!isAuto));
   controlAutoButton.setAttribute("aria-pressed", String(isAuto));
+}
+
+function setFormationStyle(style) {
+  state.formationStyle = style === "square" ? "square" : "line";
+  formationLineButton.blur();
+  formationSquareButton.blur();
+  syncFormationStyleButton();
+}
+
+function syncFormationStyleButton() {
+  const isSquare = state.formationStyle === "square";
+  formationLineButton.classList.toggle("is-active", !isSquare);
+  formationSquareButton.classList.toggle("is-active", isSquare);
+  formationLineButton.setAttribute("aria-pressed", String(!isSquare));
+  formationSquareButton.setAttribute("aria-pressed", String(isSquare));
 }
 
 function handleKeyboard(event) {
@@ -1206,6 +1236,13 @@ function formationDestinations(centerX, centerY, angle) {
   const forward = { x: Math.cos(angle), y: Math.sin(angle) };
   const lateral = { x: -Math.sin(angle), y: Math.cos(angle) };
   const roleGroups = groupSelectedFormations(units);
+  if (state.formationStyle === "square") {
+    return squareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
+  }
+  return lineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
+}
+
+function lineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
   const destinations = [];
 
   for (const role of ["frontline", "rearGuard"]) {
@@ -1237,6 +1274,84 @@ function formationDestinations(centerX, centerY, angle) {
     });
   }
   return destinations;
+}
+
+function squareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
+  const destinations = [];
+  let rowCursor = 0;
+  for (const role of ["frontline", "rearGuard"]) {
+    const formations = roleGroups.get(role);
+    if (!formations?.length) continue;
+    const rows = Math.ceil(formations.length / FORMATION_SQUARE_COLUMNS);
+    formations.forEach((formation, formationIndex) => {
+      const column = formationIndex % FORMATION_SQUARE_COLUMNS;
+      const row = Math.floor(formationIndex / FORMATION_SQUARE_COLUMNS);
+      const columnsInRow = Math.min(
+        FORMATION_SQUARE_COLUMNS,
+        formations.length - row * FORMATION_SQUARE_COLUMNS
+      );
+      const formationOffset = centeredGridOffset(
+        column,
+        rowCursor + row,
+        columnsInRow,
+        FORMATION_BLOCK_GAP,
+        FORMATION_ROLE_GAP
+      );
+      pushFormationUnitDestinations(
+        destinations,
+        formation,
+        centerX,
+        centerY,
+        angle,
+        forward,
+        lateral,
+        formationOffset
+      );
+    });
+    rowCursor += rows + 1;
+  }
+  return destinations;
+}
+
+function pushFormationUnitDestinations(
+  destinations,
+  formation,
+  centerX,
+  centerY,
+  angle,
+  forward,
+  lateral,
+  formationOffset
+) {
+  const columns = Math.min(FORMATION_SQUARE_COLUMNS, formation.units.length);
+  formation.units.forEach((unit, unitIndex) => {
+    const column = unitIndex % columns;
+    const row = Math.floor(unitIndex / columns);
+    const unitOffset = centeredGridOffset(
+      column,
+      row,
+      columns,
+      FORMATION_UNIT_SPACING,
+      FORMATION_UNIT_SPACING
+    );
+    const lateralOffset = formationOffset.lateral + unitOffset.lateral;
+    const forwardOffset = formationOffset.forward + unitOffset.forward;
+    destinations.push({
+      unitId: unit.id,
+      x: centerX + lateral.x * lateralOffset + forward.x * forwardOffset,
+      y: centerY + lateral.y * lateralOffset + forward.y * forwardOffset,
+      angle,
+      role: unit.role,
+      formationId: unit.formationId,
+    });
+  });
+}
+
+function centeredGridOffset(column, row, columns, lateralSpacing, forwardSpacing) {
+  return {
+    lateral: (column - (columns - 1) / 2) * lateralSpacing,
+    forward: -row * forwardSpacing,
+  };
 }
 
 function groupSelectedFormations(units) {
@@ -1419,6 +1534,7 @@ function exposeDebugState() {
     ready: Boolean(state.map && state.battle),
     started: state.started,
     paused: state.paused,
+    formationStyle: state.formationStyle,
     elapsed: state.battle?.elapsed ?? 0,
     winner: state.battle?.winner ?? null,
     camera: state.camera ? {
@@ -1457,6 +1573,7 @@ function exposeDebugState() {
   window.__RTS_DEBUG__ = debugState;
   canvas.dataset.ready = String(debugState.ready);
   canvas.dataset.started = String(debugState.started);
+  canvas.dataset.formationStyle = debugState.formationStyle;
   canvas.dataset.elapsed = debugState.elapsed.toFixed(2);
   canvas.dataset.winner = debugState.winner ?? "";
   canvas.dataset.shells = String(debugState.shells.length);

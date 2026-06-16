@@ -1,8 +1,8 @@
 export const DEFAULT_RULES = Object.freeze({
-  maxHp: 100,
+  maxHp: 130,
   tankSpeed: 90,
   attackRange: 650,
-  fireInterval: 1.15,
+  fireInterval: 1.35,
   shellSpeed: 1400,
   shellDamage: 25,
   hitRadius: 44,
@@ -10,7 +10,7 @@ export const DEFAULT_RULES = Object.freeze({
   rangeTolerance: 2,
   explosionFrameDuration: 0.075,
   explosionFrameCount: 9,
-  artilleryHp: 50,
+  artilleryHp: 70,
   artillerySpeed: 63,
   artilleryRange: 900,
   artilleryMinRange: 250,
@@ -35,73 +35,49 @@ export function createBattle(options = {}) {
   const allyOrigin = { x: width * 0.26, y: height * 0.64 };
   const enemyOrigin = { x: width * 0.74, y: height * 0.36 };
 
-  createFormation(units, {
-    team: "ally",
-    idPrefix: "ally-tank-a",
-    formationId: "ally-frontline-tanks-a",
-    type: "tank",
-    role: "frontline",
-    count: 3,
-    origin: { x: allyOrigin.x - 120, y: allyOrigin.y - 70 },
-    direction: { x: 1, y: -1 },
-    rules,
-  });
-  createFormation(units, {
-    team: "ally",
-    idPrefix: "ally-tank-b",
-    formationId: "ally-frontline-tanks-b",
-    type: "tank",
-    role: "frontline",
-    count: 2,
-    origin: { x: allyOrigin.x + 160, y: allyOrigin.y - 40 },
-    direction: { x: 1, y: -1 },
-    rules,
-  });
-  createFormation(units, {
-    team: "ally",
-    idPrefix: "ally-artillery-a",
-    formationId: "ally-rear-artillery-a",
-    type: "artillery",
-    role: "rearGuard",
-    count: 2,
-    origin: { x: allyOrigin.x - 220, y: allyOrigin.y + 210 },
-    direction: { x: 1, y: -1 },
-    rules,
-  });
-  createFormation(units, {
-    team: "ally",
-    idPrefix: "ally-artillery-b",
-    formationId: "ally-rear-artillery-b",
-    type: "artillery",
-    role: "rearGuard",
-    count: 2,
-    origin: { x: allyOrigin.x + 170, y: allyOrigin.y + 250 },
-    direction: { x: 1, y: -1 },
-    rules,
-  });
+  const alliedFormations = [
+    ["tank-a", "frontline-tanks-a", "tank", "frontline", -330, -125],
+    ["tank-b", "frontline-tanks-b", "tank", "frontline", -100, -60],
+    ["tank-c", "frontline-tanks-c", "tank", "frontline", 130, 5],
+    ["tank-d", "frontline-tanks-d", "tank", "frontline", 360, 70],
+    ["artillery-a", "rear-artillery-a", "artillery", "rearGuard", -190, 235],
+    ["artillery-b", "rear-artillery-b", "artillery", "rearGuard", 190, 300],
+  ];
+  for (const [id, formation, type, role, offsetX, offsetY] of alliedFormations) {
+    createFormation(units, {
+      team: "ally",
+      idPrefix: `ally-${id}`,
+      formationId: `ally-${formation}`,
+      type,
+      role,
+      count: 4,
+      origin: { x: allyOrigin.x + offsetX, y: allyOrigin.y + offsetY },
+      direction: { x: 1, y: -1 },
+      rules,
+    });
+  }
 
-  createFormation(units, {
-    team: "enemy",
-    idPrefix: "enemy-tank-a",
-    formationId: "enemy-frontline-tanks-a",
-    type: "tank",
-    role: "frontline",
-    count: 4,
-    origin: { x: enemyOrigin.x - 160, y: enemyOrigin.y - 40 },
-    direction: { x: -1, y: 1 },
-    rules,
-  });
-  createFormation(units, {
-    team: "enemy",
-    idPrefix: "enemy-tank-b",
-    formationId: "enemy-frontline-tanks-b",
-    type: "tank",
-    role: "frontline",
-    count: 4,
-    origin: { x: enemyOrigin.x + 180, y: enemyOrigin.y + 20 },
-    direction: { x: -1, y: 1 },
-    rules,
-  });
+  const enemyFormations = [
+    ["tank-a", "frontline-tanks-a", -470, -145],
+    ["tank-b", "frontline-tanks-b", -285, -80],
+    ["tank-c", "frontline-tanks-c", -100, -15],
+    ["tank-d", "frontline-tanks-d", 85, 50],
+    ["tank-e", "frontline-tanks-e", 270, 115],
+    ["tank-f", "frontline-tanks-f", 455, 180],
+  ];
+  for (const [id, formation, offsetX, offsetY] of enemyFormations) {
+    createFormation(units, {
+      team: "enemy",
+      idPrefix: `enemy-${id}`,
+      formationId: `enemy-${formation}`,
+      type: "tank",
+      role: "frontline",
+      count: 4,
+      origin: { x: enemyOrigin.x + offsetX, y: enemyOrigin.y + offsetY },
+      direction: { x: -1, y: 1 },
+      rules,
+    });
+  }
 
   return {
     width,

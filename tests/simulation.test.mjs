@@ -29,22 +29,25 @@ test("teams start far apart in the lower-left and upper-right", () => {
 test("default combat uses long range and fast shells", () => {
   const battle = createBattle();
   assert.equal(battle.rules.attackRange, 650);
+  assert.equal(battle.rules.maxHp, 130);
+  assert.equal(battle.rules.artilleryHp, 70);
+  assert.equal(battle.rules.fireInterval, 1.35);
   assert.equal(battle.rules.shellSpeed, 1400);
 });
 
-test("allies include two fragile long-range artillery units", () => {
+test("allies include two long-range artillery formations", () => {
   const battle = createBattle({ width: 3200, height: 3200 });
   const artillery = battle.units.filter(unit => unit.type === "artillery");
   const counts = teamCounts(battle);
 
-  assert.equal(artillery.length, 4);
+  assert.equal(artillery.length, 8);
   assert.ok(artillery.every(unit => unit.team === "ally"));
   assert.ok(artillery.every(unit => unit.role === "rearGuard"));
   assert.equal(new Set(artillery.map(unit => unit.formationId)).size, 2);
-  assert.ok(artillery.every(unit => unit.hp === 50 && unit.maxHp === 50));
+  assert.ok(artillery.every(unit => unit.hp === 70 && unit.maxHp === 70));
   assert.ok(artillery.every(unit => unit.x < 1600 && unit.y > 1600));
-  assert.equal(counts.ally, 9);
-  assert.equal(counts.enemy, 8);
+  assert.equal(counts.ally, 24);
+  assert.equal(counts.enemy, 24);
   assert.equal(battle.rules.artilleryRange, 900);
   assert.equal(battle.rules.artilleryFireInterval, 4);
   assert.equal(battle.allyControlMode, "hold");
@@ -54,18 +57,20 @@ test("allied tanks are split into frontline formations", () => {
   const battle = createBattle();
   const tanks = battle.units.filter(unit => unit.team === "ally" && unit.type === "tank");
 
-  assert.equal(tanks.length, 5);
+  assert.equal(tanks.length, 16);
   assert.ok(tanks.every(unit => unit.role === "frontline"));
-  assert.equal(new Set(tanks.map(unit => unit.formationId)).size, 2);
+  assert.equal(new Set(tanks.map(unit => unit.formationId)).size, 4);
+  assert.ok(tanks.every(unit => unit.hp === 130 && unit.maxHp === 130));
 });
 
 test("enemy frontline contains enough tanks to contest the enlarged force", () => {
   const battle = createBattle();
   const enemies = battle.units.filter(unit => unit.team === "enemy");
 
-  assert.equal(enemies.length, 8);
+  assert.equal(enemies.length, 24);
   assert.ok(enemies.every(unit => unit.type === "tank"));
-  assert.equal(new Set(enemies.map(unit => unit.formationId)).size, 2);
+  assert.equal(new Set(enemies.map(unit => unit.formationId)).size, 6);
+  assert.ok(enemies.every(unit => unit.hp === 130 && unit.maxHp === 130));
 });
 
 test("artillery applies area damage only when its arcing shell lands", () => {
@@ -100,13 +105,13 @@ test("artillery applies area damage only when its arcing shell lands", () => {
   const shell = battle.shells.find(item => item.type === "artillery");
   assert.ok(shell);
   assert.ok(shell.progress > 0 && shell.progress < 1);
-  assert.deepEqual(enemies.map(unit => unit.hp), [100, 100]);
+  assert.deepEqual(enemies.map(unit => unit.hp), [130, 130]);
 
   for (let step = 0; step < 17; step += 1) updateBattle(battle, 0.05);
-  assert.deepEqual(enemies.map(unit => unit.hp), [100, 100]);
+  assert.deepEqual(enemies.map(unit => unit.hp), [130, 130]);
 
   for (let step = 0; step < 3; step += 1) updateBattle(battle, 0.05);
-  assert.deepEqual(enemies.map(unit => unit.hp), [70, 70]);
+  assert.deepEqual(enemies.map(unit => unit.hp), [100, 100]);
   assert.ok(battle.explosions.length > 0);
   assert.equal(battle.shells.some(item => item.type === "artillery"), false);
 });
@@ -135,20 +140,20 @@ test("artillery retreats when an enemy enters its minimum range", () => {
 
 test("red water terrain reduces movement speed to fifty percent", () => {
   const terrainMovement = {
-    width: 10,
-    height: 10,
+    width: 32,
+    height: 32,
     tileSize: 100,
-    cells: new Float32Array(100).fill(0.5),
+    cells: new Float32Array(1024).fill(0.5),
   };
   const normal = createBattle({
-    width: 1000,
-    height: 1000,
+    width: 3200,
+    height: 3200,
     allyControlMode: "auto",
     rules: { attackRange: 0, tankSpeed: 100 },
   });
   const water = createBattle({
-    width: 1000,
-    height: 1000,
+    width: 3200,
+    height: 3200,
     allyControlMode: "auto",
     terrainMovement,
     rules: { attackRange: 0, tankSpeed: 100 },

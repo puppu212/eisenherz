@@ -3,12 +3,17 @@
   --black: #000000;
   --red: #db0814;
   --white: #ffffff;
+  --cursor-default: url("./assets/icon/mouse.png") 0 0, auto;
   --font-display: "UnifrakturCook", "UnifrakturMaguntia", "Old English Text MT", "Lucida Blackletter", Georgia, serif;
   --font-ui: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", Georgia, serif;
   font-family: var(--font-ui);
+  cursor: var(--cursor-default);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  cursor: var(--cursor-default);
+}
 
 html, body {
   width: 100%;
@@ -136,7 +141,6 @@ button {
   color: var(--white);
   font-weight: 900;
   letter-spacing: .06em;
-  cursor: pointer;
 }
 
 button:hover {
@@ -156,7 +160,6 @@ button:active {
 
 button:disabled {
   color: var(--white);
-  cursor: default;
   opacity: .45;
 }
 
@@ -352,16 +355,7 @@ button:disabled:hover {
 #close-controls { width: 100%; }
 
 .hud-panel {
-  cursor: move;
   touch-action: none;
-}
-
-.hud-panel.is-dragging {
-  cursor: grabbing;
-}
-
-.hud-panel button {
-  cursor: pointer;
 }
 
 .commander-panel {
@@ -461,7 +455,8 @@ button:disabled:hover {
   white-space: nowrap;
 }
 
-.command-mode {
+.command-mode,
+.formation-mode {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -470,26 +465,30 @@ button:disabled:hover {
   border-bottom: 3px solid var(--white);
 }
 
-.command-mode span {
+.command-mode span,
+.formation-mode span {
   color: var(--red);
   font-size: 9px;
   font-weight: 900;
   letter-spacing: .16em;
 }
 
-.command-mode-buttons {
+.command-mode-buttons,
+.formation-mode-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
 
-.command-mode button {
+.command-mode button,
+.formation-mode button {
   min-height: 30px;
   padding: 0 8px;
   font-size: 9px;
 }
 
-.command-mode button.is-active {
+.command-mode button.is-active,
+.formation-mode button.is-active {
   background: var(--white);
   color: var(--black);
 }
