@@ -1,10 +1,12 @@
 import {
+  clearFireTarget,
   createBattle,
   issueMoveOrder,
+  issueFireTarget,
   setAllyControlMode,
   teamCounts,
   updateBattle,
-} from "./simulation.js?v=9";
+} from "./simulation.js?v=10";
 import {
   CAMERA_LIMITS,
   cameraTransform,
@@ -196,6 +198,7 @@ async function boot() {
   canvas.addEventListener("pointermove", updateMapSelection);
   canvas.addEventListener("pointerup", finishMapSelection);
   canvas.addEventListener("pointercancel", cancelMapSelection);
+  canvas.addEventListener("dblclick", clearMapFireTarget);
   canvas.addEventListener("wheel", zoomWithWheel, { passive: false });
   canvas.addEventListener("gesturestart", startGestureZoom, { passive: false });
   canvas.addEventListener("gesturechange", changeGestureZoom, { passive: false });
@@ -326,6 +329,12 @@ function handleKeyboard(event) {
     }
     return;
   }
+  if (event.code === "Escape") {
+    if (event.target.matches?.("input, textarea, select, [contenteditable='true']")) return;
+    event.preventDefault();
+    selectUnitIds([]);
+    return;
+  }
   if (!["Enter", "Space"].includes(event.code) || event.repeat) return;
   if (event.target.matches?.("input, textarea, select, [contenteditable='true']")) return;
   if (!state.started) {
@@ -365,6 +374,7 @@ function render() {
   ctx.drawImage(state.mapLayer, 0, 0);
   drawBattle();
   drawActiveMoveGhosts();
+  drawFireTargetMarker();
   drawCommandPreview();
   ctx.restore();
 }
@@ -407,6 +417,36 @@ function drawActiveMoveGhosts() {
   for (const destination of destinations) {
     drawMoveGhost(destination.x, destination.y, destination.role, "committed");
   }
+  ctx.restore();
+}
+
+function drawFireTargetMarker() {
+  const target = state.battle.fireTarget;
+  if (!target) return;
+  const radius = 42;
+
+  ctx.save();
+  ctx.globalAlpha = 0.82;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, radius + 5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = "#db0814";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, radius, 0, Math.PI * 2);
+  ctx.moveTo(target.x - radius - 18, target.y);
+  ctx.lineTo(target.x - 10, target.y);
+  ctx.moveTo(target.x + 10, target.y);
+  ctx.lineTo(target.x + radius + 18, target.y);
+  ctx.moveTo(target.x, target.y - radius - 18);
+  ctx.lineTo(target.x, target.y - 10);
+  ctx.moveTo(target.x, target.y + 10);
+  ctx.lineTo(target.x, target.y + radius + 18);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -1494,9 +1534,24 @@ function finishMapSelection(event) {
     selectUnitIds(ids, drag.additive);
   } else {
     const unit = alliedUnitAtScreenPoint(point.x, point.y);
-    selectUnitIds(unit ? [unit.id] : [], drag.additive);
+    if (unit) {
+      selectUnitIds([unit.id], drag.additive);
+    } else {
+      const world = screenToWorld(point.x, point.y);
+      issueFireTarget(state.battle, world.x, world.y);
+    }
   }
   cancelMapSelection(event);
+}
+
+function clearMapFireTarget(event) {
+  if (
+    !state.started ||
+    state.battle?.winner ||
+    !battleResult.hidden
+  ) return;
+  clearFireTarget(state.battle);
+  event.preventDefault();
 }
 
 function cancelMapSelection(event) {
@@ -1598,6 +1653,10 @@ function exposeDebugState() {
       y: Math.round(shell.y),
       progress: Number((shell.progress ?? 0).toFixed(3)),
     })) ?? [],
+    fireTarget: state.battle?.fireTarget ? {
+      x: Math.round(state.battle.fireTarget.x),
+      y: Math.round(state.battle.fireTarget.y),
+    } : null,
     explosions: state.battle?.explosions?.map(explosion => ({
       id: explosion.id,
       age: Number(explosion.age.toFixed(3)),
@@ -1633,6 +1692,9 @@ function exposeDebugState() {
   canvas.dataset.artilleryProgress = String(artilleryShells[0]?.progress ?? "");
   canvas.dataset.selectedUnits = [...state.selectedUnitIds].join(",");
   canvas.dataset.selectedCount = String(state.selectedUnitIds.size);
+  canvas.dataset.fireTarget = debugState.fireTarget
+    ? `${debugState.fireTarget.x},${debugState.fireTarget.y}`
+    : "";
   canvas.dataset.explosions = String(debugState.explosions.length);
   canvas.dataset.explosionFrame = String(debugState.explosions[0]?.frame ?? "");
   canvas.dataset.minimumHp = String(

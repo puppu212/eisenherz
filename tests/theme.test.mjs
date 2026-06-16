@@ -18,12 +18,12 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /button\s*\{[^}]*border:\s*3px solid var\(--white\)/s);
   assert.doesNotMatch(css, /box-shadow|text-shadow/);
   assert.match(app, /unit\.team === "ally" \? "#ffffff" : "#db0814"/);
-  assert.match(app, /from "\.\/simulation\.js\?v=9"/);
+  assert.match(app, /from "\.\/simulation\.js\?v=10"/);
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=12"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=14"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=15"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);

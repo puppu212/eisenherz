@@ -23,6 +23,8 @@ export const DEFAULT_RULES = Object.freeze({
   moveArrivalRadius: 12,
 });
 
+const FIRE_TARGET_DIRECTION_COSINE = Math.cos(Math.PI / 4);
+
 export function facingFromDirection(directionX, threshold = 0.05) {
   return directionX > threshold ? "right" : "left";
 }
@@ -92,6 +94,7 @@ export function createBattle(options = {}) {
     winner: null,
     nextShellId: 1,
     nextExplosionId: 1,
+    fireTarget: null,
   };
 }
 
@@ -107,6 +110,10 @@ export function updateBattle(battle, deltaSeconds) {
   for (const unit of battle.units) {
     if (!unit.alive) continue;
     unit.cooldown = Math.max(0, unit.cooldown - delta);
+    if (unit.team === "ally" && battle.fireTarget) {
+      updateFireTargetUnit(battle, unit, delta);
+      continue;
+    }
     const target = nearestEnemy(unit, battle.units);
     unit.targetId = target?.id ?? null;
     if (!target) {
@@ -168,6 +175,17 @@ export function issueMoveOrder(battle, unitDestinations) {
     unit.command = { type: "move", x, y, angle };
     unit.state = "moving";
   }
+}
+
+export function issueFireTarget(battle, x, y) {
+  battle.fireTarget = {
+    x: Math.max(32, Math.min(battle.width - 32, x)),
+    y: Math.max(32, Math.min(battle.height - 32, y)),
+  };
+}
+
+export function clearFireTarget(battle) {
+  battle.fireTarget = null;
 }
 
 export function movementMultiplierAt(battle, x, y) {
@@ -268,6 +286,69 @@ function updateHeldUnit(battle, unit, target, dx, dy, distance, delta) {
   }
 }
 
+function updateFireTargetUnit(battle, unit, delta) {
+  const moved = updateManualMove(battle, unit, delta);
+  const target = battle.fireTarget;
+  if (!target) return;
+  const dx = target.x - unit.x;
+  const dy = target.y - unit.y;
+  const distance = Math.hypot(dx, dy);
+  const attackRange = unit.type === "artillery"
+    ? battle.rules.artilleryRange
+    : battle.rules.attackRange;
+  const minRange = unit.type === "artillery"
+    ? battle.rules.artilleryMinRange
+    : 0;
+  unit.targetId = null;
+
+  if (
+    distance <= attackRange + battle.rules.rangeTolerance &&
+    distance >= minRange
+  ) {
+    unit.angle = Math.atan2(dy, dx);
+    unit.facing = facingFromDirection(dx);
+    unit.state = "attacking";
+    if (unit.cooldown <= 0) {
+      if (unit.type === "artillery") {
+        fireArtilleryShellAtPoint(battle, unit, target.x, target.y);
+        unit.cooldown = battle.rules.artilleryFireInterval;
+      } else {
+        fireShellAtPoint(battle, unit, target.x, target.y);
+        unit.cooldown = battle.rules.fireInterval;
+      }
+    }
+    return;
+  }
+
+  const directionalTarget = enemyInFireTargetDirection(
+    battle,
+    unit,
+    dx,
+    dy,
+    attackRange,
+    minRange
+  );
+  if (directionalTarget) {
+    const rangePoint = pointAtRangeLimit(unit, dx, dy, attackRange);
+    unit.angle = Math.atan2(dy, dx);
+    unit.facing = facingFromDirection(dx);
+    unit.state = "attacking";
+    if (unit.cooldown <= 0) {
+      if (unit.type === "artillery") {
+        fireArtilleryShellAtPoint(battle, unit, rangePoint.x, rangePoint.y);
+        unit.cooldown = battle.rules.artilleryFireInterval;
+      } else {
+        fireShellAtPoint(battle, unit, rangePoint.x, rangePoint.y);
+        unit.cooldown = battle.rules.fireInterval;
+      }
+    }
+  } else if (!moved) {
+    unit.angle = Math.atan2(dy, dx);
+    unit.facing = facingFromDirection(dx);
+    unit.state = "holding";
+  }
+}
+
 function updateManualMove(battle, unit, delta) {
   const command = unit.command;
   if (!command || command.type !== "move") return false;
@@ -352,6 +433,41 @@ function nearestEnemy(unit, units) {
   return target;
 }
 
+function enemyInFireTargetDirection(battle, unit, targetDx, targetDy, attackRange, minRange) {
+  const targetDistance = Math.hypot(targetDx, targetDy);
+  if (!targetDistance) return null;
+  const directionX = targetDx / targetDistance;
+  const directionY = targetDy / targetDistance;
+  let target = null;
+  let bestDistance = Infinity;
+  for (const candidate of battle.units) {
+    if (!candidate.alive || candidate.team === unit.team) continue;
+    const dx = candidate.x - unit.x;
+    const dy = candidate.y - unit.y;
+    const distance = Math.hypot(dx, dy);
+    if (
+      distance > attackRange + battle.rules.rangeTolerance ||
+      distance < minRange ||
+      distance === 0
+    ) continue;
+    const alignment = (dx / distance) * directionX + (dy / distance) * directionY;
+    if (alignment < FIRE_TARGET_DIRECTION_COSINE) continue;
+    if (distance < bestDistance) {
+      target = candidate;
+      bestDistance = distance;
+    }
+  }
+  return target;
+}
+
+function pointAtRangeLimit(unit, targetDx, targetDy, attackRange) {
+  const targetDistance = Math.hypot(targetDx, targetDy) || 1;
+  return {
+    x: unit.x + (targetDx / targetDistance) * attackRange,
+    y: unit.y + (targetDy / targetDistance) * attackRange,
+  };
+}
+
 function fireShell(battle, source, target) {
   const angle = Math.atan2(target.y - source.y, target.x - source.x);
   battle.shells.push({
@@ -366,8 +482,29 @@ function fireShell(battle, source, target) {
   });
 }
 
+function fireShellAtPoint(battle, source, targetX, targetY) {
+  const angle = Math.atan2(targetY - source.y, targetX - source.x);
+  battle.shells.push({
+    id: `shell-${battle.nextShellId++}`,
+    type: "direct",
+    team: source.team,
+    targetId: null,
+    targetX,
+    targetY,
+    x: source.x + Math.cos(angle) * battle.rules.muzzleOffset,
+    y: source.y + Math.sin(angle) * battle.rules.muzzleOffset,
+    angle,
+    alive: true,
+  });
+}
+
 function fireArtilleryShell(battle, source, target) {
   const impact = artilleryAimPoint(target, battle.units, battle.rules.artilleryBlastRadius);
+  fireArtilleryShellAtPoint(battle, source, impact.x, impact.y);
+}
+
+function fireArtilleryShellAtPoint(battle, source, targetX, targetY) {
+  const impact = { x: targetX, y: targetY };
   const angle = Math.atan2(impact.y - source.y, impact.x - source.x);
   battle.shells.push({
     id: `shell-${battle.nextShellId++}`,
@@ -408,6 +545,10 @@ function updateShells(battle, delta) {
       updateArtilleryShell(battle, shell, delta);
       continue;
     }
+    if (!shell.targetId) {
+      updatePointShell(battle, shell, delta);
+      continue;
+    }
     const target = unitsById.get(shell.targetId);
     if (!target?.alive) {
       shell.alive = false;
@@ -430,6 +571,31 @@ function updateShells(battle, delta) {
     shell.y += (dy / distance) * travel;
   }
   battle.shells = battle.shells.filter(shell => shell.alive);
+}
+
+function updatePointShell(battle, shell, delta) {
+  const dx = shell.targetX - shell.x;
+  const dy = shell.targetY - shell.y;
+  const distance = Math.hypot(dx, dy);
+  shell.angle = Math.atan2(dy, dx);
+  const travel = battle.rules.shellSpeed * delta;
+  const nextX = distance > 0 ? shell.x + (dx / distance) * Math.min(travel, distance) : shell.x;
+  const nextY = distance > 0 ? shell.y + (dy / distance) * Math.min(travel, distance) : shell.y;
+  const hit = directShellPathHit(battle, shell, nextX, nextY);
+  if (hit) {
+    damageUnit(battle, hit, battle.rules.shellDamage);
+    shell.alive = false;
+    return;
+  }
+
+  if (distance <= battle.rules.hitRadius + travel || distance === 0) {
+    applyDirectImpact(battle, shell);
+    shell.alive = false;
+    return;
+  }
+
+  shell.x = nextX;
+  shell.y = nextY;
 }
 
 function updateArtilleryShell(battle, shell, delta) {
@@ -455,6 +621,40 @@ function applyArtilleryImpact(battle, shell) {
       : battle.rules.artillerySplashDamage;
     damageUnit(battle, unit, damage);
   }
+}
+
+function applyDirectImpact(battle, shell) {
+  for (const unit of battle.units) {
+    if (!unit.alive || unit.team === shell.team) continue;
+    const distance = Math.hypot(unit.x - shell.targetX, unit.y - shell.targetY);
+    if (distance > battle.rules.hitRadius) continue;
+    damageUnit(battle, unit, battle.rules.shellDamage);
+  }
+}
+
+function directShellPathHit(battle, shell, nextX, nextY) {
+  let hit = null;
+  let bestProgress = Infinity;
+  for (const unit of battle.units) {
+    if (!unit.alive || unit.team === shell.team) continue;
+    const progress = closestSegmentProgress(shell.x, shell.y, nextX, nextY, unit.x, unit.y);
+    const closestX = shell.x + (nextX - shell.x) * progress;
+    const closestY = shell.y + (nextY - shell.y) * progress;
+    const distance = Math.hypot(unit.x - closestX, unit.y - closestY);
+    if (distance > battle.rules.hitRadius || progress >= bestProgress) continue;
+    hit = unit;
+    bestProgress = progress;
+  }
+  return hit;
+}
+
+function closestSegmentProgress(startX, startY, endX, endY, pointX, pointY) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const lengthSquared = dx * dx + dy * dy;
+  if (!lengthSquared) return 0;
+  const progress = ((pointX - startX) * dx + (pointY - startY) * dy) / lengthSquared;
+  return Math.max(0, Math.min(1, progress));
 }
 
 function damageUnit(battle, unit, damage) {

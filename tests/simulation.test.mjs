@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  clearFireTarget,
   createBattle,
   facingFromDirection,
+  issueFireTarget,
   issueMoveOrder,
   movementMultiplierAt,
   setAllyControlMode,
@@ -285,4 +287,144 @@ test("manual move orders move held allies toward assigned destinations", () => {
   assert.equal(ally.command?.type, "move");
   setAllyControlMode(battle, "auto");
   assert.equal(battle.allyControlMode, "auto");
+});
+
+test("fire target makes all allied units shoot the marked point when in range", () => {
+  const battle = createBattle({
+    width: 1000,
+    height: 600,
+    rules: {
+      attackRange: 1000,
+      fireInterval: 100,
+      shellSpeed: 5000,
+      shellDamage: 25,
+      artilleryRange: 1000,
+      artilleryMinRange: 0,
+      artilleryFireInterval: 100,
+      artilleryFlightTime: 1,
+    },
+  });
+  const tank = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const artillery = battle.units.find(unit => unit.id === "ally-artillery-a-1");
+  battle.units = [tank, artillery, ...battle.units.filter(unit => unit.team === "enemy").slice(0, 1)];
+  tank.x = 100;
+  tank.y = 300;
+  tank.cooldown = 0;
+  artillery.x = 140;
+  artillery.y = 340;
+  artillery.cooldown = 0;
+
+  issueFireTarget(battle, 700, 300);
+  updateBattle(battle, 0.05);
+
+  assert.deepEqual(battle.fireTarget, { x: 700, y: 300 });
+  assert.equal(tank.targetId, null);
+  assert.equal(artillery.targetId, null);
+  assert.ok(battle.shells.some(shell => shell.type === "direct" && shell.targetX === 700));
+  assert.ok(battle.shells.some(shell => shell.type === "artillery" && shell.targetX === 700));
+
+  clearFireTarget(battle);
+  assert.equal(battle.fireTarget, null);
+});
+
+test("fire target does not fire units that are out of range", () => {
+  const battle = createBattle({
+    width: 2000,
+    height: 1200,
+    rules: {
+      attackRange: 100,
+      fireInterval: 100,
+      artilleryRange: 120,
+      artilleryMinRange: 0,
+      artilleryFireInterval: 100,
+    },
+  });
+  const tank = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const artillery = battle.units.find(unit => unit.id === "ally-artillery-a-1");
+  battle.units = [tank, artillery, ...battle.units.filter(unit => unit.team === "enemy").slice(0, 1)];
+  tank.x = 100;
+  tank.y = 300;
+  tank.cooldown = 0;
+  artillery.x = 120;
+  artillery.y = 320;
+  artillery.cooldown = 0;
+
+  issueFireTarget(battle, 900, 300);
+  updateBattle(battle, 0.05);
+
+  assert.equal(battle.shells.length, 0);
+  assert.equal(tank.state, "holding");
+  assert.equal(artillery.state, "holding");
+});
+
+test("out of range fire target shoots the range limit when enemies enter the marked direction", () => {
+  const battle = createBattle({
+    width: 1200,
+    height: 800,
+    rules: {
+      attackRange: 240,
+      fireInterval: 100,
+      shellSpeed: 100,
+      artilleryRange: 260,
+      artilleryMinRange: 0,
+      artilleryFireInterval: 100,
+      artilleryFlightTime: 1,
+    },
+  });
+  const tank = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const artillery = battle.units.find(unit => unit.id === "ally-artillery-a-1");
+  const enemy = battle.units.find(unit => unit.team === "enemy");
+  battle.units = [tank, artillery, enemy];
+  tank.x = 100;
+  tank.y = 300;
+  tank.cooldown = 0;
+  artillery.x = 100;
+  artillery.y = 300;
+  artillery.cooldown = 0;
+  enemy.x = 290;
+  enemy.y = 300;
+
+  issueFireTarget(battle, 900, 300);
+  updateBattle(battle, 0.05);
+
+  assert.equal(tank.targetId, null);
+  assert.equal(artillery.targetId, null);
+  assert.ok(battle.shells.some(shell =>
+    shell.type === "direct" &&
+    shell.targetId === null &&
+    Math.abs(shell.targetX - 340) < 0.001 &&
+    Math.abs(shell.targetY - 300) < 0.001
+  ));
+  assert.ok(battle.shells.some(shell =>
+    shell.type === "artillery" &&
+    Math.abs(shell.targetX - 360) < 0.001 &&
+    Math.abs(shell.targetY - 300) < 0.001
+  ));
+});
+
+test("direct point fire can hit enemies along the shell path before the target point", () => {
+  const battle = createBattle({
+    width: 900,
+    height: 600,
+    rules: {
+      attackRange: 500,
+      fireInterval: 100,
+      shellSpeed: 5000,
+      shellDamage: 25,
+    },
+  });
+  const tank = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const enemy = battle.units.find(unit => unit.team === "enemy");
+  battle.units = [tank, enemy];
+  tank.x = 100;
+  tank.y = 300;
+  tank.cooldown = 0;
+  enemy.x = 300;
+  enemy.y = 300;
+
+  issueFireTarget(battle, 500, 300);
+  updateBattle(battle, 0.05);
+
+  assert.equal(enemy.hp, enemy.maxHp - battle.rules.shellDamage);
+  assert.equal(battle.shells.length, 0);
 });
