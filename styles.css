@@ -13,10 +13,16 @@
 html, body {
   width: 100%;
   height: 100%;
+  min-height: 100%;
   margin: 0;
   overflow: hidden;
   background: var(--black);
   color: var(--white);
+}
+
+body {
+  position: fixed;
+  inset: 0;
 }
 
 button { font: inherit; }
@@ -25,7 +31,10 @@ button { font: inherit; }
   display: grid;
   grid-template-rows: 76px minmax(0, 1fr);
   width: 100%;
-  height: 100%;
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--black);
 }
 
 .top-bar {
@@ -173,18 +182,60 @@ button:disabled:hover {
 }
 
 .loading {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 30;
   display: grid;
   place-items: center;
   background: var(--black);
   color: var(--white);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: .08em;
 }
 
-.loading.error { color: var(--red); }
+.loading-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(520px, calc(100vw - 40px));
+  padding: 34px 28px 28px;
+  border: 4px solid var(--white);
+  background: var(--black);
+  text-align: center;
+}
+
+.loading-kicker {
+  margin: 0;
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .24em;
+}
+
+.loading strong {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 8vw, 74px);
+  line-height: .85;
+  letter-spacing: .03em;
+}
+
+.loading span {
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.loading i {
+  display: block;
+  width: min(240px, 60vw);
+  height: 6px;
+  margin-top: 6px;
+  background: var(--red);
+}
+
+.loading.error .loading-card { border-color: var(--red); }
+.loading.error .loading-kicker,
+.loading.error span { color: var(--red); }
+.loading.error i { background: var(--white); }
 .loading[hidden] { display: none; }
 
 .start-screen {

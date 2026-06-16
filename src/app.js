@@ -18,6 +18,7 @@ import {
 const canvas = document.getElementById("battlefield");
 const ctx = canvas.getContext("2d");
 const loading = document.getElementById("loading");
+const loadingMessage = document.getElementById("loading-message");
 const allyCount = document.getElementById("ally-count");
 const enemyCount = document.getElementById("enemy-count");
 const battleMessage = document.getElementById("battle-message");
@@ -102,7 +103,7 @@ const state = {
 
 boot().catch(error => {
   console.error(error);
-  loading.textContent = `起動エラー: ${error.message}`;
+  loadingMessage.textContent = `起動エラー: ${error.message}`;
   loading.classList.add("error");
 });
 
@@ -125,11 +126,15 @@ async function boot() {
   );
   zoomLevel.textContent = `${Math.round(state.camera.scale * 100)}%`;
   resetBattle({ waitForStart: true });
-  resizeCanvas();
-  window.addEventListener("resize", resizeCanvas);
+  syncViewportSize();
+  window.visualViewport?.addEventListener("resize", syncViewportSize);
+  window.visualViewport?.addEventListener("scroll", syncViewportSize);
+  window.addEventListener("resize", syncViewportSize);
+  window.addEventListener("orientationchange", syncViewportSize);
   window.addEventListener("pointermove", updateEdgeScroll);
   window.addEventListener("pointerout", stopEdgeScrollOutsideWindow);
   window.addEventListener("blur", clearEdgeScroll);
+  window.addEventListener("click", blurClickedButton);
   pauseButton.addEventListener("click", togglePause);
   controlHoldButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   controlAutoButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
@@ -255,6 +260,10 @@ function stopPanelDragFromControlButton(event) {
   event.stopPropagation();
 }
 
+function blurClickedButton(event) {
+  event.target.closest?.("button")?.blur();
+}
+
 function syncControlModeButton() {
   const isAuto = state.battle?.allyControlMode === "auto";
   controlHoldButton.classList.toggle("is-active", !isAuto);
@@ -264,6 +273,9 @@ function syncControlModeButton() {
 }
 
 function handleKeyboard(event) {
+  if (event.code === "Space") {
+    event.preventDefault();
+  }
   if (!controlsDialog.hidden) {
     if (event.code === "Escape") {
       event.preventDefault();
@@ -272,10 +284,12 @@ function handleKeyboard(event) {
     return;
   }
   if (!["Enter", "Space"].includes(event.code) || event.repeat) return;
-  if (event.target.matches?.("input, textarea, select, button, [contenteditable='true']")) return;
-  event.preventDefault();
+  if (event.target.matches?.("input, textarea, select, [contenteditable='true']")) return;
   if (!state.started) {
-    startBattle();
+    if (event.code === "Enter") {
+      event.preventDefault();
+      startBattle();
+    }
     return;
   }
   if (event.code !== "Space") return;
@@ -332,7 +346,7 @@ function drawCommandPreview() {
   ctx.lineJoin = "miter";
   drawCommandArrow(drag.startX, drag.startY, drag.currentX, drag.currentY, angle);
   for (const destination of destinations) {
-    drawMoveGhost(destination.x, destination.y, destination.role);
+    drawMoveGhost(destination.x, destination.y, destination.role, "preview");
   }
   ctx.restore();
 }
@@ -349,18 +363,25 @@ function drawActiveMoveGhosts() {
 
   ctx.save();
   for (const destination of destinations) {
-    drawMoveGhost(destination.x, destination.y, destination.role);
+    drawMoveGhost(destination.x, destination.y, destination.role, "committed");
   }
   ctx.restore();
 }
 
-function drawMoveGhost(x, y, role) {
+function drawMoveGhost(x, y, role, variant = "preview") {
+  const isCommitted = variant === "committed";
+  ctx.globalAlpha = isCommitted ? 0.62 : 1;
+  ctx.setLineDash(isCommitted ? [10, 8] : []);
   ctx.strokeStyle = role === "frontline" ? "#ffffff" : "#db0814";
-  ctx.lineWidth = 5;
+  ctx.lineWidth = isCommitted ? 3 : 5;
   ctx.strokeRect(x - 24, y - 24, 48, 48);
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x - 18, y - 18, 36, 36);
+  ctx.setLineDash([]);
+  if (!isCommitted) {
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 18, y - 18, 36, 36);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawCommandArrow(startX, startY, currentX, currentY, angle) {
@@ -545,6 +566,12 @@ function createTerrainMovement(map) {
     tileSize: map.tileSize,
     cells,
   };
+}
+
+function syncViewportSize() {
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  document.documentElement.style.setProperty("--app-height", `${viewportHeight}px`);
+  resizeCanvas();
 }
 
 function resizeCanvas() {
@@ -824,13 +851,16 @@ function handlePanelSelection(event) {
   const roleButton = event.target.closest("[data-select-role]");
   const allButton = event.target.closest("[data-select-scope='all']");
   if (unitButton) {
-    selectUnitIds([unitButton.dataset.selectUnit], event.shiftKey);
+    toggleUnitSelection([unitButton.dataset.selectUnit], event.shiftKey);
   } else if (formationButton) {
-    selectBy(unit => unit.formationId === formationButton.dataset.selectFormation, event.shiftKey);
+    toggleSelectionBy(
+      unit => unit.formationId === formationButton.dataset.selectFormation,
+      event.shiftKey
+    );
   } else if (roleButton) {
-    selectBy(unit => unit.role === roleButton.dataset.selectRole, event.shiftKey);
+    toggleSelectionBy(unit => unit.role === roleButton.dataset.selectRole, event.shiftKey);
   } else if (allButton) {
-    selectBy(() => true, event.shiftKey);
+    toggleSelectionBy(() => true, event.shiftKey);
   }
 }
 
@@ -902,7 +932,7 @@ function cancelPanelSelection(event) {
 
 function startHudPanelDrag(event) {
   if (event.button !== 0) return;
-  if (event.target.closest?.(".command-mode button")) return;
+  if (event.target.closest?.("button")) return;
   const panel = event.currentTarget;
   const rect = panel.getBoundingClientRect();
   state.hudPanelDrag = {
@@ -1057,12 +1087,27 @@ function selectBy(predicate, additive = false) {
   selectUnitIds(ids, additive);
 }
 
+function toggleSelectionBy(predicate, additive = false) {
+  const ids = state.battle.units
+    .filter(unit => unit.team === "ally" && unit.alive && predicate(unit))
+    .map(unit => unit.id);
+  toggleUnitSelection(ids, additive);
+}
+
+function toggleUnitSelection(ids, additive = false) {
+  const eligibleIds = aliveAllyIds();
+  const nextIds = ids.filter(id => eligibleIds.has(id));
+  if (!additive && isEntireGroupSelected(nextIds)) {
+    state.selectedUnitIds.clear();
+    syncFormationPanel();
+    exposeDebugState();
+    return;
+  }
+  selectUnitIds(nextIds, additive);
+}
+
 function selectUnitIds(ids, additive = false) {
-  const eligible = new Set(
-    state.battle.units
-      .filter(unit => unit.team === "ally" && unit.alive)
-      .map(unit => unit.id)
-  );
+  const eligible = aliveAllyIds();
   const nextIds = ids.filter(id => eligible.has(id));
   if (!additive) state.selectedUnitIds.clear();
   for (const id of nextIds) {
@@ -1074,6 +1119,14 @@ function selectUnitIds(ids, additive = false) {
   }
   syncFormationPanel();
   exposeDebugState();
+}
+
+function aliveAllyIds() {
+  return new Set(
+    state.battle.units
+      .filter(unit => unit.team === "ally" && unit.alive)
+      .map(unit => unit.id)
+  );
 }
 
 function startCommandDrag(event) {

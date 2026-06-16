@@ -27,7 +27,14 @@
 
     <section class="battlefield-wrap">
       <canvas id="battlefield" aria-label="自動戦闘マップ"></canvas>
-      <div id="loading" class="loading">マップと部隊を読み込んでいます...</div>
+      <div id="loading" class="loading" role="status" aria-live="polite">
+        <div class="loading-card">
+          <p class="loading-kicker">EISENHERZ</p>
+          <strong>LOADING</strong>
+          <span id="loading-message">戦場データを構築しています</span>
+          <i aria-hidden="true"></i>
+        </div>
+      </div>
       <section id="start-screen" class="start-screen" aria-labelledby="start-title" hidden>
         <p class="start-kicker">VAHREN WEB EDITION</p>
         <h2 id="start-title">EISENHERZ</h2>
