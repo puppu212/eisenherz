@@ -177,6 +177,14 @@ export function issueMoveOrder(battle, unitDestinations) {
   }
 }
 
+export function clearMoveOrders(battle) {
+  for (const unit of battle.units) {
+    if (unit.team !== "ally" || unit.command?.type !== "move") continue;
+    unit.command = null;
+    if (unit.alive) unit.state = "holding";
+  }
+}
+
 export function issueFireTarget(battle, x, y) {
   battle.fireTarget = {
     x: Math.max(32, Math.min(battle.width - 32, x)),

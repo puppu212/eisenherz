@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   clearFireTarget,
+  clearMoveOrders,
   createBattle,
   facingFromDirection,
   issueFireTarget,
@@ -287,6 +288,19 @@ test("manual move orders move held allies toward assigned destinations", () => {
   assert.equal(ally.command?.type, "move");
   setAllyControlMode(battle, "auto");
   assert.equal(battle.allyControlMode, "auto");
+});
+
+test("clearing move orders removes active allied destinations", () => {
+  const battle = createBattle({ width: 1200, height: 800 });
+  const ally = battle.units.find(unit => unit.id === "ally-tank-a-2");
+
+  issueMoveOrder(battle, [{ unitId: ally.id, x: ally.x + 120, y: ally.y, angle: 0 }]);
+  assert.equal(ally.command?.type, "move");
+
+  clearMoveOrders(battle);
+
+  assert.equal(ally.command, null);
+  assert.equal(ally.state, "holding");
 });
 
 test("fire target makes all allied units shoot the marked point when in range", () => {

@@ -1,5 +1,6 @@
 import {
   clearFireTarget,
+  clearMoveOrders,
   createBattle,
   issueMoveOrder,
   issueFireTarget,
@@ -137,11 +138,12 @@ async function boot() {
   );
   zoomLevel.textContent = `${Math.round(state.camera.scale * 100)}%`;
   resetBattle({ waitForStart: true });
-  syncViewportSize();
+  scheduleViewportSync();
   window.visualViewport?.addEventListener("resize", syncViewportSize);
   window.visualViewport?.addEventListener("scroll", syncViewportSize);
   window.addEventListener("resize", syncViewportSize);
   window.addEventListener("orientationchange", syncViewportSize);
+  document.addEventListener("fullscreenchange", scheduleViewportSync);
   window.addEventListener("pointermove", updateEdgeScroll);
   window.addEventListener("pointerout", stopEdgeScrollOutsideWindow);
   window.addEventListener("blur", clearEdgeScroll);
@@ -277,6 +279,7 @@ function syncPauseButton() {
 
 function setControlMode(mode) {
   if (!state.battle) return;
+  clearMoveOrders(state.battle);
   setAllyControlMode(state.battle, mode);
   controlHoldButton.blur();
   controlAutoButton.blur();
@@ -652,9 +655,24 @@ function createTerrainMovement(map) {
 }
 
 function syncViewportSize() {
-  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const viewportHeight = currentViewportHeight();
   document.documentElement.style.setProperty("--app-height", `${viewportHeight}px`);
   resizeCanvas();
+}
+
+function scheduleViewportSync() {
+  syncViewportSize();
+  requestAnimationFrame(syncViewportSize);
+  setTimeout(syncViewportSize, 100);
+  setTimeout(syncViewportSize, 300);
+}
+
+function currentViewportHeight() {
+  return Math.max(
+    document.documentElement.clientHeight,
+    window.innerHeight,
+    Math.round(window.visualViewport?.height ?? 0)
+  );
 }
 
 function resizeCanvas() {
