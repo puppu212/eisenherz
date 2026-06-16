@@ -22,7 +22,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
-  assert.match(html, /href="\.\/styles\.css\?v=10"/);
+  assert.match(html, /href="\.\/styles\.css\?v=12"/);
   assert.match(html, /src="\.\/src\/app\.js\?v=14"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
@@ -78,7 +78,11 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.start-screen\s*\{[^}]*position:\s*fixed;[^}]*background:\s*var\(--black\)/s);
   assert.match(css, /#start-battle\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(css, /\.controls-dialog\s*\{[^}]*border:\s*4px solid var\(--white\)/s);
-  assert.match(css, /\.commander-panel\s*\{[^}]*width:\s*min\(320px, calc\(100vw - 28px\)\);[^}]*border:\s*3px solid var\(--white\)/s);
+  assert.match(css, /\.commander-panel\s*\{[^}]*width:\s*min\(360px, calc\(100vw - 28px\)\);[^}]*border:\s*3px solid var\(--white\)/s);
+  assert.match(css, /\.commander-summary\s*\{[^}]*grid-template-columns:\s*96px minmax\(0, 1fr\);[^}]*min-height:\s*96px/s);
+  assert.match(css, /\.commander-portrait\s*\{[^}]*width:\s*96px;[^}]*height:\s*96px;[^}]*aspect-ratio:\s*1 \/ 1/s);
+  assert.match(css, /\.force-status div\s*\{[^}]*display:\s*grid;[^}]*border:\s*2px solid var\(--white\)/s);
+  assert.match(css, /\.panel-status\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\);[^}]*border-bottom:\s*3px solid var\(--white\)/s);
   assert.doesNotMatch(css, /cursor:\s*move/);
   assert.doesNotMatch(css, /cursor:\s*grabbing/);
   assert.match(css, /\.command-mode-buttons,\s*\.formation-mode-buttons\s*\{[^}]*grid-template-columns:\s*1fr 1fr/s);
