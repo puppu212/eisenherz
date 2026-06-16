@@ -483,8 +483,15 @@ button:disabled:hover {
 .command-mode-buttons,
 .formation-mode-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 4px;
+}
+
+.command-mode-buttons {
+  grid-template-columns: 1fr 1fr;
+}
+
+.formation-mode-buttons {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .command-mode button,

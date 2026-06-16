@@ -43,6 +43,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /id="set-control-auto"[^>]*tabindex="-1"[^>]*>AUTO<\/button>/);
   assert.match(html, /id="set-formation-line"[^>]*tabindex="-1"[^>]*>LINE<\/button>/);
   assert.match(html, /id="set-formation-square"[^>]*tabindex="-1"[^>]*>SQUARE<\/button>/);
+  assert.match(html, /id="set-formation-dense"[^>]*tabindex="-1"[^>]*>DENSE<\/button>/);
   assert.match(html, /data-select-role="frontline">FRONTLINE<\/button>/);
   assert.match(html, /data-select-role="rearGuard">REAR GUARD<\/button>/);
   assert.match(html, /id="selection-box"[^>]*hidden/);
@@ -85,7 +86,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.panel-status\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\);[^}]*border-bottom:\s*3px solid var\(--white\)/s);
   assert.doesNotMatch(css, /cursor:\s*move/);
   assert.doesNotMatch(css, /cursor:\s*grabbing/);
-  assert.match(css, /\.command-mode-buttons,\s*\.formation-mode-buttons\s*\{[^}]*grid-template-columns:\s*1fr 1fr/s);
+  assert.match(css, /\.command-mode-buttons\s*\{[^}]*grid-template-columns:\s*1fr 1fr/s);
+  assert.match(css, /\.formation-mode-buttons\s*\{[^}]*grid-template-columns:\s*repeat\(3, 1fr\)/s);
   assert.match(css, /\.unit-status-panel\s*\{[^}]*top:\s*14px;[^}]*right:\s*14px;[^}]*width:\s*min\(390px, calc\(100vw - 28px\)\)/s);
   assert.match(css, /\.formation-units\s*\{[^}]*overflow-x:\s*auto/s);
   assert.match(css, /\.unit-card\.is-selected\s*\{[^}]*border-color:\s*var\(--red\)/s);
@@ -126,6 +128,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function startCommandDrag\(event\)/);
   assert.match(app, /function formationDestinations\(centerX, centerY, angle\)/);
   assert.match(app, /function squareFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
+  assert.match(app, /function denseFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
   assert.match(app, /function lineFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
   assert.match(app, /function centeredGridOffset\(column, row, columns, lateralSpacing, forwardSpacing\)/);
   assert.match(app, /canvas\.dataset\.formationStyle = debugState\.formationStyle/);

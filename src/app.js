@@ -28,6 +28,7 @@ const controlHoldButton = document.getElementById("set-control-hold");
 const controlAutoButton = document.getElementById("set-control-auto");
 const formationLineButton = document.getElementById("set-formation-line");
 const formationSquareButton = document.getElementById("set-formation-square");
+const formationDenseButton = document.getElementById("set-formation-dense");
 const zoomLevel = document.getElementById("zoom-level");
 const panelUnitCount = document.getElementById("panel-unit-count");
 const panelStrength = document.getElementById("panel-strength");
@@ -79,6 +80,8 @@ const FORMATION_UNIT_SPACING = 92;
 const FORMATION_BLOCK_GAP = 96;
 const FORMATION_ROLE_GAP = 190;
 const FORMATION_SQUARE_COLUMNS = 2;
+const FORMATION_DENSE_COLUMNS = 5;
+const FORMATION_DENSE_UNIT_SPACING = 64;
 
 const state = {
   map: null,
@@ -144,6 +147,7 @@ async function boot() {
   controlAutoButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   formationLineButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   formationSquareButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
+  formationDenseButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   controlHoldButton.addEventListener("click", event => {
     event.stopPropagation();
     setControlMode("hold");
@@ -159,6 +163,10 @@ async function boot() {
   formationSquareButton.addEventListener("click", event => {
     event.stopPropagation();
     setFormationStyle("square");
+  });
+  formationDenseButton.addEventListener("click", event => {
+    event.stopPropagation();
+    setFormationStyle("dense");
   });
   restartButton.addEventListener("click", () => {
     resetBattle({ waitForStart: !state.started });
@@ -288,18 +296,23 @@ function syncControlModeButton() {
 }
 
 function setFormationStyle(style) {
-  state.formationStyle = style === "square" ? "square" : "line";
+  state.formationStyle = ["line", "square", "dense"].includes(style) ? style : "line";
   formationLineButton.blur();
   formationSquareButton.blur();
+  formationDenseButton.blur();
   syncFormationStyleButton();
 }
 
 function syncFormationStyleButton() {
+  const isLine = state.formationStyle === "line";
   const isSquare = state.formationStyle === "square";
-  formationLineButton.classList.toggle("is-active", !isSquare);
+  const isDense = state.formationStyle === "dense";
+  formationLineButton.classList.toggle("is-active", isLine);
   formationSquareButton.classList.toggle("is-active", isSquare);
-  formationLineButton.setAttribute("aria-pressed", String(!isSquare));
+  formationDenseButton.classList.toggle("is-active", isDense);
+  formationLineButton.setAttribute("aria-pressed", String(isLine));
   formationSquareButton.setAttribute("aria-pressed", String(isSquare));
+  formationDenseButton.setAttribute("aria-pressed", String(isDense));
 }
 
 function handleKeyboard(event) {
@@ -1237,6 +1250,9 @@ function formationDestinations(centerX, centerY, angle) {
   if (state.formationStyle === "square") {
     return squareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
   }
+  if (state.formationStyle === "dense") {
+    return denseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
+  }
   return lineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
 }
 
@@ -1308,6 +1324,40 @@ function squareFormationDestinations(centerX, centerY, angle, forward, lateral, 
     });
     rowCursor += rows + 1;
   }
+  return destinations;
+}
+
+function denseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
+  const destinations = [];
+  const units = [];
+  for (const role of ["frontline", "rearGuard"]) {
+    for (const formation of roleGroups.get(role) ?? []) {
+      units.push(...formation.units);
+    }
+  }
+
+  const columns = Math.min(FORMATION_DENSE_COLUMNS, units.length);
+  units.forEach((unit, unitIndex) => {
+    const row = Math.floor(unitIndex / columns);
+    const rowStart = row * columns;
+    const columnsInRow = Math.min(columns, units.length - rowStart);
+    const column = unitIndex - rowStart;
+    const unitOffset = centeredGridOffset(
+      column,
+      row,
+      columnsInRow,
+      FORMATION_DENSE_UNIT_SPACING,
+      FORMATION_DENSE_UNIT_SPACING
+    );
+    destinations.push({
+      unitId: unit.id,
+      x: centerX + lateral.x * unitOffset.lateral + forward.x * unitOffset.forward,
+      y: centerY + lateral.y * unitOffset.lateral + forward.y * unitOffset.forward,
+      angle,
+      role: unit.role,
+      formationId: unit.formationId,
+    });
+  });
   return destinations;
 }
 
