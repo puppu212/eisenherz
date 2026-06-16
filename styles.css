@@ -363,7 +363,7 @@ button:disabled:hover {
   left: 14px;
   bottom: 14px;
   z-index: 2;
-  width: min(320px, calc(100vw - 28px));
+  width: min(360px, calc(100vw - 28px));
   border: 3px solid var(--white);
   background: var(--black);
   color: var(--white);
@@ -371,15 +371,16 @@ button:disabled:hover {
 
 .commander-summary {
   display: grid;
-  grid-template-columns: 82px 1fr;
-  min-height: 108px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-height: 96px;
   border-bottom: 3px solid var(--white);
 }
 
 .commander-portrait {
-  width: 82px;
-  height: 100%;
-  min-height: 102px;
+  display: block;
+  width: 96px;
+  height: 96px;
+  aspect-ratio: 1 / 1;
   border-right: 3px solid var(--white);
   object-fit: cover;
 }
@@ -387,9 +388,9 @@ button:disabled:hover {
 .commander-info {
   display: grid;
   align-content: center;
-  gap: 5px;
+  gap: 7px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .panel-kicker,
@@ -405,7 +406,7 @@ button:disabled:hover {
 .commander-name {
   overflow: hidden;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 34px;
   line-height: 1;
   letter-spacing: .03em;
   text-overflow: ellipsis;
@@ -415,23 +416,25 @@ button:disabled:hover {
 .force-status {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 2px 0 0;
+  gap: 6px;
+  margin: 0;
+  padding: 6px;
+  border-bottom: 3px solid var(--white);
 }
 
 .force-status div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 7px;
-  padding-top: 4px;
-  border-top: 2px solid var(--white);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 2px solid var(--white);
 }
 
 .force-status dt {
   font-size: 9px;
   font-weight: 900;
   letter-spacing: .08em;
+  white-space: nowrap;
 }
 
 .force-status dd {
@@ -443,14 +446,18 @@ button:disabled:hover {
 }
 
 .panel-status {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 3px solid var(--white);
 }
 
 .panel-status b {
   overflow: hidden;
   color: var(--red);
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -814,12 +821,13 @@ button:disabled:hover {
   .commander-panel {
     left: 8px;
     bottom: 8px;
-    width: min(300px, calc(100vw - 16px));
+    width: min(320px, calc(100vw - 16px));
   }
-  .commander-summary { grid-template-columns: 72px 1fr; min-height: 94px; }
-  .commander-portrait { width: 72px; min-height: 92px; }
+  .commander-summary { grid-template-columns: 72px 1fr; min-height: 72px; }
+  .commander-portrait { width: 72px; height: 72px; }
   .commander-info { gap: 3px; padding: 7px 9px; }
-  .commander-name { font-size: 19px; }
+  .commander-name { font-size: 24px; }
+  .force-status { padding: 5px; }
   .force-status dd { font-size: 14px; }
   .selection-actions { gap: 4px; padding: 6px; }
   .selection-actions button { padding: 0 4px; font-size: 8px; }
