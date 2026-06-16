@@ -16,6 +16,15 @@ import {
   moveCamera,
   zoomCameraAt,
 } from "./camera.js";
+import {
+  buildFormationDestinations,
+  centeredGridOffset as calculateCenteredGridOffset,
+  denseFormationDestinations as buildDenseFormationDestinations,
+  groupSelectedFormations as groupFormationsByRole,
+  lineFormationDestinations as buildLineFormationDestinations,
+  pushFormationUnitDestinations as pushCalculatedFormationUnitDestinations,
+  squareFormationDestinations as buildSquareFormationDestinations,
+} from "./formation.js";
 
 const canvas = document.getElementById("battlefield");
 const ctx = canvas.getContext("2d");
@@ -78,13 +87,6 @@ const EXPLOSION_SIZE = 176;
 const EXPLOSION_HALF_SIZE = EXPLOSION_SIZE / 2;
 const EXPLOSION_FRAME_COUNT = 9;
 const HP_BAR_WIDTH = 96;
-const FORMATION_UNIT_SPACING = 92;
-const FORMATION_BLOCK_GAP = 96;
-const FORMATION_ROLE_GAP = 190;
-const FORMATION_SQUARE_COLUMNS = 2;
-const FORMATION_DENSE_COLUMNS = 5;
-const FORMATION_DENSE_UNIT_SPACING = 64;
-
 const state = {
   map: null,
   mapLayer: null,
@@ -1283,122 +1285,25 @@ function selectedUnitsCenter() {
 
 function formationDestinations(centerX, centerY, angle) {
   const units = selectedLivingAllies();
-  if (units.length === 0) return [];
-  const forward = { x: Math.cos(angle), y: Math.sin(angle) };
-  const lateral = { x: -Math.sin(angle), y: Math.cos(angle) };
-  const roleGroups = groupSelectedFormations(units);
-  if (state.formationStyle === "square") {
-    return squareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
-  }
-  if (state.formationStyle === "dense") {
-    return denseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
-  }
-  return lineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
+  return buildFormationDestinations({
+    centerX,
+    centerY,
+    angle,
+    units,
+    style: state.formationStyle,
+  });
 }
 
 function lineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
-  const destinations = [];
-
-  for (const role of ["frontline", "rearGuard"]) {
-    const formations = roleGroups.get(role);
-    if (!formations?.length) continue;
-    const roleOffset = role === "frontline" ? 0 : -FORMATION_ROLE_GAP;
-    const blockWidths = formations.map(formation =>
-      Math.max(FORMATION_UNIT_SPACING, (formation.units.length - 1) * FORMATION_UNIT_SPACING)
-    );
-    const totalWidth = blockWidths.reduce((sum, width) => sum + width, 0) +
-      Math.max(0, formations.length - 1) * FORMATION_BLOCK_GAP;
-    let cursor = -totalWidth / 2;
-    formations.forEach((formation, formationIndex) => {
-      const blockWidth = blockWidths[formationIndex];
-      const blockCenter = cursor + blockWidth / 2;
-      const unitStart = -((formation.units.length - 1) * FORMATION_UNIT_SPACING) / 2;
-      formation.units.forEach((unit, unitIndex) => {
-        const unitOffset = blockCenter + unitStart + unitIndex * FORMATION_UNIT_SPACING;
-        destinations.push({
-          unitId: unit.id,
-          x: centerX + lateral.x * unitOffset + forward.x * roleOffset,
-          y: centerY + lateral.y * unitOffset + forward.y * roleOffset,
-          angle,
-          role: unit.role,
-          formationId: unit.formationId,
-        });
-      });
-      cursor += blockWidth + FORMATION_BLOCK_GAP;
-    });
-  }
-  return destinations;
+  return buildLineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
 }
 
 function squareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
-  const destinations = [];
-  let rowCursor = 0;
-  for (const role of ["frontline", "rearGuard"]) {
-    const formations = roleGroups.get(role);
-    if (!formations?.length) continue;
-    const rows = Math.ceil(formations.length / FORMATION_SQUARE_COLUMNS);
-    formations.forEach((formation, formationIndex) => {
-      const column = formationIndex % FORMATION_SQUARE_COLUMNS;
-      const row = Math.floor(formationIndex / FORMATION_SQUARE_COLUMNS);
-      const columnsInRow = Math.min(
-        FORMATION_SQUARE_COLUMNS,
-        formations.length - row * FORMATION_SQUARE_COLUMNS
-      );
-      const formationOffset = centeredGridOffset(
-        column,
-        rowCursor + row,
-        columnsInRow,
-        FORMATION_BLOCK_GAP,
-        FORMATION_ROLE_GAP
-      );
-      pushFormationUnitDestinations(
-        destinations,
-        formation,
-        centerX,
-        centerY,
-        angle,
-        forward,
-        lateral,
-        formationOffset
-      );
-    });
-    rowCursor += rows + 1;
-  }
-  return destinations;
+  return buildSquareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
 }
 
 function denseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
-  const destinations = [];
-  const units = [];
-  for (const role of ["frontline", "rearGuard"]) {
-    for (const formation of roleGroups.get(role) ?? []) {
-      units.push(...formation.units);
-    }
-  }
-
-  const columns = Math.min(FORMATION_DENSE_COLUMNS, units.length);
-  units.forEach((unit, unitIndex) => {
-    const row = Math.floor(unitIndex / columns);
-    const rowStart = row * columns;
-    const columnsInRow = Math.min(columns, units.length - rowStart);
-    const column = unitIndex - rowStart;
-    const unitOffset = centeredGridOffset(
-      column,
-      row,
-      columnsInRow,
-      FORMATION_DENSE_UNIT_SPACING,
-      FORMATION_DENSE_UNIT_SPACING
-    );
-    destinations.push({
-      unitId: unit.id,
-      x: centerX + lateral.x * unitOffset.lateral + forward.x * unitOffset.forward,
-      y: centerY + lateral.y * unitOffset.lateral + forward.y * unitOffset.forward,
-      angle,
-      role: unit.role,
-      formationId: unit.formationId,
-    });
-  });
-  return destinations;
+  return buildDenseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
 }
 
 function pushFormationUnitDestinations(
@@ -1411,57 +1316,24 @@ function pushFormationUnitDestinations(
   lateral,
   formationOffset
 ) {
-  const columns = Math.min(FORMATION_SQUARE_COLUMNS, formation.units.length);
-  formation.units.forEach((unit, unitIndex) => {
-    const column = unitIndex % columns;
-    const row = Math.floor(unitIndex / columns);
-    const unitOffset = centeredGridOffset(
-      column,
-      row,
-      columns,
-      FORMATION_UNIT_SPACING,
-      FORMATION_UNIT_SPACING
-    );
-    const lateralOffset = formationOffset.lateral + unitOffset.lateral;
-    const forwardOffset = formationOffset.forward + unitOffset.forward;
-    destinations.push({
-      unitId: unit.id,
-      x: centerX + lateral.x * lateralOffset + forward.x * forwardOffset,
-      y: centerY + lateral.y * lateralOffset + forward.y * forwardOffset,
-      angle,
-      role: unit.role,
-      formationId: unit.formationId,
-    });
-  });
+  pushCalculatedFormationUnitDestinations(
+    destinations,
+    formation,
+    centerX,
+    centerY,
+    angle,
+    forward,
+    lateral,
+    formationOffset
+  );
 }
 
 function centeredGridOffset(column, row, columns, lateralSpacing, forwardSpacing) {
-  return {
-    lateral: (column - (columns - 1) / 2) * lateralSpacing,
-    forward: -row * forwardSpacing,
-  };
+  return calculateCenteredGridOffset(column, row, columns, lateralSpacing, forwardSpacing);
 }
 
 function groupSelectedFormations(units) {
-  const roleGroups = new Map();
-  for (const unit of units) {
-    if (!roleGroups.has(unit.role)) roleGroups.set(unit.role, new Map());
-    const formations = roleGroups.get(unit.role);
-    if (!formations.has(unit.formationId)) {
-      formations.set(unit.formationId, {
-        id: unit.formationId,
-        units: [],
-      });
-    }
-    formations.get(unit.formationId).units.push(unit);
-  }
-  const ordered = new Map();
-  for (const role of ["frontline", "rearGuard"]) {
-    const formations = roleGroups.get(role);
-    if (!formations) continue;
-    ordered.set(role, [...formations.values()].sort((a, b) => a.id.localeCompare(b.id)));
-  }
-  return ordered;
+  return groupFormationsByRole(units);
 }
 
 function selectedLivingAllies() {
