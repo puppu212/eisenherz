@@ -295,7 +295,10 @@ function updateHeldUnit(battle, unit, target, dx, dy, distance, delta) {
 }
 
 function updateFireTargetUnit(battle, unit, delta) {
-  const moved = updateManualMove(battle, unit, delta);
+  let moved = updateManualMove(battle, unit, delta);
+  if (!moved && battle.allyControlMode === "auto") {
+    moved = updateAutoPositioningUnit(battle, unit, delta);
+  }
   const target = battle.fireTarget;
   if (!target) return;
   const dx = target.x - unit.x;
@@ -355,6 +358,62 @@ function updateFireTargetUnit(battle, unit, delta) {
     unit.facing = facingFromDirection(dx);
     unit.state = "holding";
   }
+}
+
+function updateAutoPositioningUnit(battle, unit, delta) {
+  const target = nearestEnemy(unit, battle.units);
+  if (!target) return false;
+  const dx = target.x - unit.x;
+  const dy = target.y - unit.y;
+  const distance = Math.hypot(dx, dy);
+  const terrainMultiplier = movementMultiplierAt(battle, unit.x, unit.y);
+
+  if (unit.type === "artillery") {
+    unit.angle = Math.atan2(dy, dx);
+    unit.facing = facingFromDirection(dx);
+    if (distance < battle.rules.artilleryMinRange) {
+      unit.state = "retreating";
+      moveUnit(
+        unit,
+        -dx,
+        -dy,
+        battle.rules.artillerySpeed * terrainMultiplier * delta,
+        battle
+      );
+      return true;
+    }
+    if (distance > battle.rules.artilleryRange + battle.rules.rangeTolerance) {
+      unit.state = "moving";
+      moveUnit(
+        unit,
+        dx,
+        dy,
+        Math.min(
+          battle.rules.artillerySpeed * terrainMultiplier * delta,
+          distance - battle.rules.artilleryRange
+        ),
+        battle
+      );
+      return true;
+    }
+    return false;
+  }
+
+  if (distance <= battle.rules.attackRange + battle.rules.rangeTolerance) return false;
+  unit.state = "moving";
+  moveUnit(
+    unit,
+    dx,
+    dy,
+    Math.min(
+      battle.rules.tankSpeed * terrainMultiplier * delta,
+      distance - battle.rules.attackRange
+    ),
+    battle
+  );
+  unit.angle = Math.atan2(dy, dx);
+  unit.facing = facingFromDirection(dx);
+  return true;
 }
 
 function updateManualMove(battle, unit, delta) {

@@ -341,6 +341,65 @@ test("fire target makes all allied units shoot the marked point when in range", 
   assert.equal(battle.fireTarget, null);
 });
 
+test("auto allies keep advancing while firing at a marked point", () => {
+  const battle = createBattle({
+    width: 1200,
+    height: 800,
+    allyControlMode: "auto",
+    rules: {
+      attackRange: 300,
+      tankSpeed: 100,
+      fireInterval: 100,
+      shellSpeed: 1000,
+      shellDamage: 25,
+    },
+  });
+  const tank = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const enemy = battle.units.find(unit => unit.team === "enemy");
+  battle.units = [tank, enemy];
+  tank.x = 100;
+  tank.y = 300;
+  tank.cooldown = 0;
+  enemy.x = 900;
+  enemy.y = 300;
+  const startX = tank.x;
+
+  issueFireTarget(battle, 350, 300);
+  updateBattle(battle, 0.05);
+
+  assert.ok(tank.x > startX);
+  assert.equal(tank.state, "attacking");
+  assert.ok(battle.shells.some(shell => shell.targetId === null && shell.targetX === 350));
+});
+
+test("auto allies keep advancing toward enemies when fire target is out of range", () => {
+  const battle = createBattle({
+    width: 1600,
+    height: 1000,
+    allyControlMode: "auto",
+    rules: {
+      attackRange: 100,
+      tankSpeed: 100,
+      fireInterval: 100,
+    },
+  });
+  const tank = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const enemy = battle.units.find(unit => unit.team === "enemy");
+  battle.units = [tank, enemy];
+  tank.x = 100;
+  tank.y = 300;
+  enemy.x = 900;
+  enemy.y = 300;
+  const startX = tank.x;
+
+  issueFireTarget(battle, 1200, 300);
+  updateBattle(battle, 0.05);
+
+  assert.ok(tank.x > startX);
+  assert.equal(tank.state, "moving");
+  assert.equal(battle.shells.length, 0);
+});
+
 test("fire target does not fire units that are out of range", () => {
   const battle = createBattle({
     width: 2000,
