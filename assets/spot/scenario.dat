@@ -1,0 +1,10 @@
+scenario sc
+{
+	spot = spot1, spot2;
+
+	showSpot(spot1)
+	showSpot(spot2)
+
+	linkSpot(spot1, spot2)
+
+}

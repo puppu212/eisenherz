@@ -76,6 +76,24 @@ test("enemy frontline contains enough tanks to contest the enlarged force", () =
   assert.ok(enemies.every(unit => unit.hp === 130 && unit.maxHp === 130));
 });
 
+test("battle can be created from a strategy operation roster", () => {
+  const battle = createBattle({
+    alliedUnits: [
+      { id: "own-tank-1", type: "tank", role: "frontline", formationId: "own-tank" },
+      { id: "own-gun-1", type: "artillery", role: "rearGuard", formationId: "own-gun" },
+    ],
+    enemyUnits: [
+      { id: "target-tank-1", type: "tank", role: "frontline", formationId: "target-tank" },
+    ],
+  });
+
+  assert.equal(battle.units.length, 3);
+  assert.equal(battle.units.find(unit => unit.id === "own-tank-1").team, "ally");
+  assert.equal(battle.units.find(unit => unit.id === "own-gun-1").type, "artillery");
+  assert.equal(battle.units.find(unit => unit.id === "target-tank-1").team, "enemy");
+  assert.deepEqual(teamCounts(battle), { ally: 2, enemy: 1 });
+});
+
 test("artillery applies area damage only when its arcing shell lands", () => {
   const battle = createBattle({
     width: 1000,
@@ -288,6 +306,47 @@ test("manual move orders move held allies toward assigned destinations", () => {
   assert.equal(ally.command?.type, "move");
   setAllyControlMode(battle, "auto");
   assert.equal(battle.allyControlMode, "auto");
+});
+
+test("manual move order only removes the ordered unit from global auto control", () => {
+  const battle = createBattle({
+    width: 1600,
+    height: 1000,
+    allyControlMode: "auto",
+    rules: { attackRange: 100, tankSpeed: 100 },
+  });
+  const ordered = battle.units.find(unit => unit.id === "ally-tank-a-1");
+  const automatic = battle.units.find(unit => unit.id === "ally-tank-a-2");
+  const enemy = battle.units.find(unit => unit.team === "enemy");
+  battle.units = [ordered, automatic, enemy];
+  ordered.x = 100;
+  ordered.y = 300;
+  automatic.x = 100;
+  automatic.y = 400;
+  enemy.x = 1200;
+  enemy.y = 350;
+  const automaticStartX = automatic.x;
+
+  issueMoveOrder(battle, [{ unitId: ordered.id, x: 100, y: 600, angle: 0 }]);
+  updateBattle(battle, 0.05);
+
+  assert.equal(battle.allyControlMode, "auto");
+  assert.equal(ordered.controlMode, "hold");
+  assert.ok(ordered.y > 300);
+  assert.ok(automatic.x > automaticStartX);
+});
+
+test("setting a global control mode clears individual manual overrides", () => {
+  const battle = createBattle({ allyControlMode: "auto" });
+  const ally = battle.units.find(unit => unit.team === "ally");
+
+  issueMoveOrder(battle, [{ unitId: ally.id, x: ally.x + 120, y: ally.y, angle: 0 }]);
+  assert.equal(ally.controlMode, "hold");
+
+  setAllyControlMode(battle, "auto");
+
+  assert.equal(battle.allyControlMode, "auto");
+  assert.equal(ally.controlMode, null);
 });
 
 test("clearing move orders removes active allied destinations", () => {

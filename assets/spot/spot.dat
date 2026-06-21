@@ -1,0 +1,16 @@
+
+spot spot1
+{
+	name = spot1
+	x = 1705
+	y = 1085
+	image = spot
+}
+
+spot spot2
+{
+	name = spot2
+	x = 1905
+	y = 1085
+	image = spot
+}

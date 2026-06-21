@@ -16,13 +16,13 @@
         <h1>DEMO</h1>
       </div>
       <div class="battle-status" aria-live="polite">
-        <span class="team-count ally"><b id="ally-count">24</b> ALLIES</span>
+        <span class="team-count ally"><b id="ally-count">1</b> <span id="ally-label">OWN</span></span>
         <span id="battle-message">ENGAGED</span>
-        <span class="team-count enemy"><b id="enemy-count">24</b> ENEMIES</span>
+        <span class="team-count enemy"><b id="enemy-count">1</b> <span id="enemy-label">NEUTRAL</span></span>
       </div>
       <div class="controls">
-        <button id="toggle-pause" type="button" aria-pressed="false">PAUSE</button>
-        <button id="restart" type="button">RESTART</button>
+        <button id="toggle-pause" type="button" aria-pressed="false">END TURN</button>
+        <button id="restart" type="button">BATTLE DEMO</button>
       </div>
     </header>
 
@@ -108,6 +108,32 @@
           <button type="button" data-select-role="rearGuard">REAR GUARD</button>
         </div>
       </aside>
+      <aside id="strategy-panel" class="strategy-panel hud-panel" aria-label="Strategy phase controls">
+        <header class="strategy-heading">
+          <img class="strategy-master-portrait" src="./assets/character/char1.webp" alt="勢力マスター">
+          <div class="strategy-master-info">
+            <p class="panel-kicker">FACTION MASTER</p>
+            <h2>OPERATIONS</h2>
+          </div>
+        </header>
+        <dl class="strategy-status">
+          <div>
+            <dt>TURN</dt>
+            <dd id="strategy-turn">1</dd>
+          </div>
+          <div>
+            <dt>PHASE</dt>
+            <dd id="strategy-phase">PLAYER</dd>
+          </div>
+        </dl>
+        <section class="strategy-selection" aria-label="Selected operation">
+          <p><span>FROM</span><b id="strategy-source">NONE</b></p>
+          <p><span>TARGET</span><b id="strategy-target">NONE</b></p>
+        </section>
+        <div id="strategy-selected-forces" class="strategy-selected-forces" hidden></div>
+        <p id="strategy-message" class="strategy-message">自領地を選択してください</p>
+      </aside>
+      <div id="strategy-spot-panels" class="strategy-spot-panels" aria-label="Opened spot panels"></div>
       <aside class="unit-status-panel hud-panel" aria-label="Allied unit status and selection">
         <header class="unit-status-heading">
           <h2>UNIT STATUS</h2>
@@ -127,15 +153,34 @@
         </div>
         <button id="result-restart" type="button">RESTART BATTLE</button>
       </section>
+      <section
+        id="invasion-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invasion-title"
+        hidden
+      >
+        <header class="invasion-dialog-header">
+          <p class="result-kicker">OPERATION</p>
+          <h2 id="invasion-title">戦闘を開始しますか？</h2>
+        </header>
+        <p id="invasion-summary" class="invasion-summary"></p>
+        <div class="invasion-actions">
+          <button id="confirm-invasion" type="button">START BATTLE</button>
+          <button id="cancel-invasion" type="button">CANCEL</button>
+        </div>
+      </section>
       <div class="legend">
-        <span><i class="ally-dot"></i>味方部隊</span>
-        <span><i class="enemy-dot"></i>敵戦車</span>
-        <span>空地左クリック: 射撃指定 / 左ドラッグ: 選択 / ホイール: 拡大縮小</span>
-        <span id="zoom-level">60%</span>
+        <span><i class="ally-dot"></i>自領地</span>
+        <span><i class="enemy-dot"></i>中立 / 退却線</span>
+        <span id="legend-help">拠点クリック: 選択 / 画面端: スクロール</span>
+        <span id="zoom-level">54%</span>
       </div>
+      <div id="screen-transition" class="screen-transition" aria-hidden="true" hidden></div>
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=15"></script>
+  <script type="module" src="./src/app.js?v=16"></script>
 </body>
 </html>
