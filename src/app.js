@@ -26,18 +26,46 @@ import {
   pushFormationUnitDestinations as pushCalculatedFormationUnitDestinations,
   squareFormationDestinations as buildSquareFormationDestinations,
 } from "./formation.js";
+import {
+  FLOW_EVENT,
+  FLOW_SCREEN,
+  createGameFlow,
+  transitionGameFlow,
+} from "./game-flow.js";
+import {
+  STRATEGY_UNIT_CATALOG,
+  areStrategySpotsLinked as areSpotsLinked,
+  canInvadeStrategyTarget,
+  createInvasionOperation,
+  createStrategyState,
+  getStrategySpot,
+  hireStrategyUnit as hireUnit,
+  resolveStrategyBattle,
+  selectedStrategyUnits as getSelectedStrategyUnits,
+} from "./strategy.js";
 
 const canvas = document.getElementById("battlefield");
 const ctx = canvas.getContext("2d");
 const loading = document.getElementById("loading");
 const loadingMessage = document.getElementById("loading-message");
+const titleScreen = document.getElementById("title-screen");
+const titleDifficultyButtons = [...document.querySelectorAll(".title-difficulty")];
+const scenarioScreen = document.getElementById("scenario-screen");
+const scenarioStartButton = document.getElementById("scenario-start");
+const scenarioList = document.getElementById("scenario-list");
+const scenarioTitle = document.getElementById("scenario-title");
+const scenarioDescription = document.getElementById("scenario-description");
+const scenarioFaction = document.getElementById("scenario-faction");
+const scenarioObjective = document.getElementById("scenario-objective");
+const scenarioDifficulty = document.getElementById("scenario-difficulty");
+const scenarioLoading = document.getElementById("scenario-loading");
+const scenarioLoadingImage = document.getElementById("scenario-loading-image");
 const allyCount = document.getElementById("ally-count");
 const enemyCount = document.getElementById("enemy-count");
 const allyLabel = document.getElementById("ally-label");
 const enemyLabel = document.getElementById("enemy-label");
 const battleMessage = document.getElementById("battle-message");
 const pauseButton = document.getElementById("toggle-pause");
-const restartButton = document.getElementById("restart");
 const controlHoldButton = document.getElementById("set-control-hold");
 const controlAutoButton = document.getElementById("set-control-auto");
 const formationLineButton = document.getElementById("set-formation-line");
@@ -74,9 +102,13 @@ const strategyMessage = document.getElementById("strategy-message");
 const strategySelectedForces = document.getElementById("strategy-selected-forces");
 const strategySpotPanels = document.getElementById("strategy-spot-panels");
 const invasionDialog = document.getElementById("invasion-dialog");
+const invasionTitle = document.getElementById("invasion-title");
 const invasionSummary = document.getElementById("invasion-summary");
 const confirmInvasionButton = document.getElementById("confirm-invasion");
 const cancelInvasionButton = document.getElementById("cancel-invasion");
+const battleBriefing = document.getElementById("battle-briefing");
+const battleBriefingSummary = document.getElementById("battle-briefing-summary");
+const beginBattleButton = document.getElementById("begin-battle");
 const legendHelp = document.getElementById("legend-help");
 
 const ROLE_LABELS = {
@@ -92,37 +124,35 @@ const OWNER_LABELS = {
   enemy: "ENEMY",
   neutral: "NEUTRAL",
 };
-const STRATEGY_UNIT_CATALOG = Object.freeze({
-  tank: {
-    type: "tank",
-    role: "frontline",
-    cost: 120,
-    label: "TANK",
+const SCENARIOS = Object.freeze([
+  {
+    id: "demo",
+    number: "01",
+    title: "DEMO 01",
+    year: "1938",
+    region: "EUROPE",
+    description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    faction: "EISENHERZ",
+    objective: "ALL TERRITORIES",
+    unlocked: true,
   },
-  artillery: {
-    type: "artillery",
-    role: "rearGuard",
-    cost: 180,
-    label: "ARTILLERY",
+  {
+    id: "counterstrike",
+    number: "02",
+    title: "DEMO 02",
+    year: "1939",
+    region: "EASTERN FRONT",
+    unlocked: false,
   },
-});
-const INITIAL_PLAYER_FORMATIONS = Object.freeze([
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "artillery", count: 4 },
-  { type: "artillery", count: 4 },
+  {
+    id: "ironwall",
+    number: "03",
+    title: "DEMO 03",
+    year: "1940",
+    region: "CENTRAL EUROPE",
+    unlocked: false,
+  },
 ]);
-const INITIAL_ENEMY_FORMATIONS = Object.freeze([
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-]);
-
 const ASSET_URLS = {
   ally: "./assets/unit/ger1.webp",
   allyArtillery: "./assets/unit/ger2.webp",
@@ -136,6 +166,12 @@ const STRATEGY_ASSET_URLS = {
   spot2: "./assets/spot/spot2.webp",
   flag1: "./assets/flag/flag1.png",
 };
+const SCENARIO_LOADING_ART = Object.freeze([
+  { url: "./assets/load/load02.webp", position: "center" },
+  { url: "./assets/load/load03.webp", position: "center" },
+  { url: "./assets/load/load04.webp", position: "center" },
+  { url: "./assets/load/load5.webp", position: "center" },
+]);
 const UNIT_SIZE = 128;
 const UNIT_HALF_SIZE = UNIT_SIZE / 2;
 const SHELL_SIZE = 56;
@@ -149,17 +185,22 @@ const HP_BAR_WIDTH = 96;
 const SPOT_SIZE = 72;
 const SPOT_HIT_RADIUS = 48;
 const SPOT_LABEL_OFFSET_Y = 56;
-const FLAG_SIZE = 44;
+const FLAG_SIZE = 36;
 const STRATEGY_CAMERA_SCALE = 1.8;
 const STRATEGY_EDGE_SPEED = 780;
 const SCREEN_TRANSITION_FADE_MS = 220;
 const SCREEN_TRANSITION_HOLD_MS = 520;
+const SCENARIO_LOADING_HOLD_MS = 1200;
+const BATTLE_HUD_INTERVAL_MS = 100;
 const state = {
+  flow: createGameFlow(),
   mode: "strategy",
+  selectedScenarioId: SCENARIOS[0].id,
   map: null,
   mapLayer: null,
   images: {},
   strategyImages: {},
+  strategyData: null,
   strategy: null,
   explosionFrames: [],
   battle: null,
@@ -185,8 +226,12 @@ const state = {
   activeOperation: null,
   pendingOperation: null,
   resolvedBattleOperation: false,
+  strategyCleared: false,
   transitioning: false,
   nextHudPanelZIndex: 3,
+  lastBattleHudUpdate: 0,
+  strategyRenderKey: null,
+  lastScenarioLoadingArtIndex: -1,
 };
 
 boot().catch(error => {
@@ -207,6 +252,7 @@ async function boot() {
   state.map = map;
   state.images = images;
   state.strategyImages = strategyImages;
+  state.strategyData = strategyData;
   state.strategy = createStrategyState(strategyData);
   state.explosionFrames = explosionFrames;
   state.terrainMovement = createTerrainMovement(map);
@@ -250,8 +296,12 @@ async function boot() {
     event.stopPropagation();
     setFormationStyle("dense");
   });
-  restartButton.addEventListener("click", togglePrimaryMode);
   resultRestartButton.addEventListener("click", () => {
+    if (state.strategyCleared) {
+      state.strategyCleared = false;
+      runScreenTransition(returnToScenarioScreen);
+      return;
+    }
     if (state.activeOperation) {
       transitionToStrategyMode();
     } else {
@@ -273,9 +323,18 @@ async function boot() {
   window.addEventListener("pointercancel", cancelStrategyForceDrag);
   confirmInvasionButton.addEventListener("click", confirmPendingInvasion);
   cancelInvasionButton.addEventListener("click", cancelPendingInvasion);
-  invasionDialog.querySelector(".invasion-dialog-header").addEventListener("pointerdown", startHudPanelDrag);
+  beginBattleButton.addEventListener("click", beginBriefedBattle);
   showControlsButton.addEventListener("click", showControls);
   closeControlsButton.addEventListener("click", hideControls);
+  for (const button of titleDifficultyButtons) {
+    button.addEventListener("click", () => openScenarioScreen(button.dataset.difficulty));
+  }
+  scenarioList.addEventListener("click", event => {
+    const button = event.target.closest("[data-scenario-id]");
+    if (!button || button.disabled) return;
+    selectScenario(button.dataset.scenarioId);
+  });
+  scenarioStartButton.addEventListener("click", startSelectedScenario);
   commanderPanel.addEventListener("click", handlePanelSelection);
   commanderPanel.addEventListener("pointerdown", startHudPanelDrag);
   unitStatusPanel.addEventListener("click", handlePanelSelection);
@@ -288,6 +347,7 @@ async function boot() {
   window.addEventListener("pointerup", finishHudPanelDrag);
   window.addEventListener("pointercancel", cancelHudPanelDrag);
   window.addEventListener("keydown", handleKeyboard);
+  window.addEventListener("contextmenu", handleScreenBack);
   canvas.addEventListener("contextmenu", event => event.preventDefault());
   canvas.addEventListener("pointerdown", startCommandDrag);
   canvas.addEventListener("pointermove", updateCommandDrag);
@@ -303,87 +363,173 @@ async function boot() {
   canvas.addEventListener("gesturechange", changeGestureZoom, { passive: false });
   canvas.addEventListener("gestureend", endGestureZoom);
   loading.hidden = true;
+  preloadScenarioLoadingArt();
+  renderScenarioSelection();
   enterStrategyMode();
+  showTitleScreen();
   state.lastTime = performance.now();
   requestAnimationFrame(frame);
 }
 
-function createStrategyState(data) {
-  const funds = data.funds ?? { player: 720, enemy: 0, neutral: 0 };
-  return {
-    width: data.width,
-    height: data.height,
-    funds: { player: 0, enemy: 0, neutral: 0, ...funds },
-    spots: data.spots.map((spot, index) => ({
-      ...spot,
-      units: createStrategySpotUnits(spot, index),
-    })),
-    links: data.links.map(link => ({ type: "route", ...link })),
-    turn: 1,
-    phase: "player",
-    selectedSpotId: null,
-    selectedSourceId: null,
-    selectedTargetId: null,
-    selectedUnitIds: new Set(),
-    openSpotPanels: new Map(),
-    nextUnitId: 1,
-    message: "自領地を選択してください",
-  };
-}
-
-function createStrategySpotUnits(spot, index) {
-  if (Array.isArray(spot.units)) {
-    return spot.units.map((unit, unitIndex) => createStrategyUnit({
-      type: unit.type,
-      owner: spot.owner,
-      spotId: spot.id,
-      formationIndex: unit.formationIndex ?? unitIndex,
-      unitIndex,
-    }));
-  }
-
-  if (spot.owner === "player") {
-    return createStrategyFormations(spot, INITIAL_PLAYER_FORMATIONS);
-  }
-
-  return createStrategyFormations(spot, INITIAL_ENEMY_FORMATIONS, index);
-}
-
-function createStrategyFormations(spot, formations, formationOffset = 0) {
-  return formations.flatMap((formation, formationIndex) =>
-    createStrategyFormation(
-      spot,
-      formation.type,
-      formation.count,
-      formationOffset + formationIndex
-    )
-  );
-}
-
-function createStrategyFormation(spot, type, count, formationIndex) {
-  return Array.from({ length: count }, (_, unitIndex) => createStrategyUnit({
-    type,
-    owner: spot.owner,
-    spotId: spot.id,
-    formationIndex,
-    unitIndex,
+function renderScenarioSelection() {
+  scenarioList.replaceChildren(...SCENARIOS.map(scenario => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.scenarioId = scenario.id;
+    button.disabled = !scenario.unlocked;
+    button.innerHTML = `<span class="scenario-number">${scenario.number}</span><span><b>${scenario.title}</b><small>${scenario.year} · ${scenario.region}</small></span>`;
+    return button;
   }));
+  selectScenario(state.selectedScenarioId);
 }
 
-function createStrategyUnit({ type, owner, spotId, formationIndex, unitIndex }) {
-  const catalog = STRATEGY_UNIT_CATALOG[type] ?? STRATEGY_UNIT_CATALOG.tank;
-  const team = owner === "player" ? "ally" : "enemy";
-  return {
-    id: `${spotId}-${catalog.type}-${formationIndex}-${unitIndex + 1}`,
-    team,
-    type: catalog.type,
-    role: catalog.role,
-    spotId,
-    formationId: `${spotId}-${catalog.type}-${formationIndex}`,
-    hp: 1,
-    maxHp: 1,
-    alive: true,
-  };
+function selectScenario(scenarioId) {
+  const scenario = SCENARIOS.find(candidate => candidate.id === scenarioId && candidate.unlocked)
+    ?? SCENARIOS.find(candidate => candidate.unlocked);
+  if (!scenario) return;
+  state.selectedScenarioId = scenario.id;
+  for (const button of scenarioList.querySelectorAll("[data-scenario-id]")) {
+    const selected = button.dataset.scenarioId === scenario.id;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+  scenarioTitle.textContent = scenario.title;
+  scenarioDescription.textContent = scenario.description;
+  scenarioFaction.textContent = scenario.faction;
+  scenarioObjective.textContent = scenario.objective;
+}
+
+function showTitleScreen() {
+  const event = state.flow.screen === FLOW_SCREEN.BOOT
+    ? FLOW_EVENT.BOOT_READY
+    : FLOW_EVENT.BACK;
+  updateGameFlow(event);
+}
+
+function handleScreenBack(event) {
+  if (state.flow.screen === FLOW_SCREEN.SCENARIO) {
+    event.preventDefault();
+    if (!state.transitioning) runScreenTransition(showTitleScreen);
+    return;
+  }
+  if (state.flow.screen === FLOW_SCREEN.STRATEGY) {
+    event.preventDefault();
+    if (!state.transitioning) runScreenTransition(returnToScenarioScreen);
+  }
+}
+
+function returnToScenarioScreen() {
+  resetStrategyState();
+  updateGameFlow(FLOW_EVENT.RETURN_SCENARIOS);
+}
+
+function openScenarioScreen(difficulty = "easy") {
+  if (state.flow.screen !== FLOW_SCREEN.TITLE || state.transitioning) return;
+  const difficultyDisplay = {
+    easy: { label: "EASY" },
+    normal: { label: "NORMAL" },
+    hard: { label: "HARD" },
+  }[difficulty] ?? { label: "EASY" };
+  scenarioDifficulty.textContent = difficultyDisplay.label;
+  runScreenTransition(() => updateGameFlow(FLOW_EVENT.CHOOSE_DIFFICULTY, { difficulty }));
+}
+
+function startSelectedScenario() {
+  if (state.flow.screen !== FLOW_SCREEN.SCENARIO || state.transitioning) return;
+  runScenarioLoadingTransition();
+}
+
+function preloadScenarioLoadingArt() {
+  for (const art of SCENARIO_LOADING_ART) {
+    const image = new Image();
+    image.src = art.url;
+  }
+}
+
+function selectScenarioLoadingArt() {
+  const availableIndexes = SCENARIO_LOADING_ART
+    .map((_, index) => index)
+    .filter(index => index !== state.lastScenarioLoadingArtIndex);
+  const index = availableIndexes[Math.floor(Math.random() * availableIndexes.length)] ?? 0;
+  state.lastScenarioLoadingArtIndex = index;
+  return SCENARIO_LOADING_ART[index];
+}
+
+async function runScenarioLoadingTransition() {
+  if (state.transitioning) return;
+  state.transitioning = true;
+  const art = selectScenarioLoadingArt();
+  scenarioLoadingImage.src = art.url;
+  scenarioLoading.style.setProperty("--loading-art-position", art.position);
+
+  try {
+    await scenarioLoadingImage.decode().catch(() => {});
+    screenTransition.hidden = false;
+    await nextAnimationFrame();
+    screenTransition.classList.add("is-visible");
+    await delay(SCREEN_TRANSITION_FADE_MS);
+
+    updateGameFlow(FLOW_EVENT.START_SCENARIO, { scenarioId: state.selectedScenarioId });
+    await nextAnimationFrame();
+    screenTransition.classList.remove("is-visible");
+    await delay(SCREEN_TRANSITION_FADE_MS);
+    await delay(SCENARIO_LOADING_HOLD_MS);
+
+    screenTransition.classList.add("is-visible");
+    await delay(SCREEN_TRANSITION_FADE_MS);
+    enterStrategyMode();
+    updateGameFlow(FLOW_EVENT.FINISH_LOADING);
+    state.lastTime = performance.now();
+
+    await nextAnimationFrame();
+    screenTransition.classList.remove("is-visible");
+    await delay(SCREEN_TRANSITION_FADE_MS);
+  } finally {
+    scenarioLoading.hidden = true;
+    screenTransition.classList.remove("is-visible");
+    screenTransition.hidden = true;
+    state.transitioning = false;
+  }
+}
+
+function updateGameFlow(event, payload = {}) {
+  state.flow = transitionGameFlow(state.flow, event, payload);
+  syncFlowScreen();
+}
+
+function syncFlowScreen() {
+  const { screen } = state.flow;
+  titleScreen.hidden = screen !== FLOW_SCREEN.TITLE;
+  scenarioScreen.hidden = screen !== FLOW_SCREEN.SCENARIO;
+  scenarioLoading.hidden = screen !== FLOW_SCREEN.LOADING;
+  document.body.classList.toggle(
+    "is-front-screen",
+    [FLOW_SCREEN.TITLE, FLOW_SCREEN.SCENARIO, FLOW_SCREEN.LOADING].includes(screen)
+  );
+  if ([FLOW_SCREEN.TITLE, FLOW_SCREEN.SCENARIO, FLOW_SCREEN.LOADING, FLOW_SCREEN.CLEAR].includes(screen)) {
+    pauseButton.disabled = true;
+  }
+}
+
+function resetStrategyState() {
+  closeStrategyTransientUi();
+  state.strategy = createStrategyState(state.strategyData);
+  state.camera = createStrategyCamera();
+  state.activeOperation = null;
+  state.pendingOperation = null;
+  state.resolvedBattleOperation = false;
+  state.strategyCleared = false;
+  state.strategyRenderKey = null;
+}
+
+function closeStrategyTransientUi() {
+  if (!state.strategy) return;
+  cancelStrategyPanelSelection();
+  cancelStrategyForceDrag();
+  for (const panel of state.strategy.openSpotPanels.values()) panel.remove();
+  state.strategy.openSpotPanels.clear();
+  invasionDialog.hidden = true;
+  battleBriefing.hidden = true;
 }
 
 function createStrategyCamera() {
@@ -401,6 +547,7 @@ function createBattleCamera() {
 }
 
 function enterStrategyMode() {
+  closeStrategyTransientUi();
   state.mode = "strategy";
   state.started = true;
   state.paused = false;
@@ -408,17 +555,18 @@ function enterStrategyMode() {
   state.pendingOperation = null;
   state.resolvedBattleOperation = false;
   invasionDialog.hidden = true;
+  battleBriefing.hidden = true;
   state.camera = createStrategyCamera();
   clampCamera(state.camera, canvas.clientWidth, canvas.clientHeight);
   startScreen.hidden = true;
   battleResult.hidden = true;
+  controlsDialog.hidden = true;
   selectionBox.hidden = true;
   panelSelectionBox.hidden = true;
   commanderPanel.hidden = true;
   unitStatusPanel.hidden = true;
   strategyPanel.hidden = false;
   strategySpotPanels.hidden = false;
-  restartButton.textContent = "BATTLE DEMO";
   allyLabel.textContent = "OWN";
   enemyLabel.textContent = "NEUTRAL";
   pauseButton.textContent = "END TURN";
@@ -440,28 +588,34 @@ function enterBattleMode(options = {}) {
   unitStatusPanel.hidden = false;
   strategyPanel.hidden = true;
   strategySpotPanels.hidden = true;
-  restartButton.textContent = "STRATEGY";
   allyLabel.textContent = "ALLIES";
   enemyLabel.textContent = "ENEMIES";
   legendHelp.textContent = "空地左クリック: 射撃指定 / 左ドラッグ: 選択 / ホイール: 拡大縮小";
-  resetBattle({ waitForStart: options.waitForStart ?? false, operation: state.activeOperation });
-}
-
-function togglePrimaryMode() {
-  if (state.transitioning) return;
-  if (state.mode === "strategy") {
-    transitionToBattleMode();
-  } else {
-    transitionToStrategyMode();
-  }
+  resetBattle({
+    waitForStart: options.waitForStart ?? false,
+    showBriefing: options.showBriefing ?? false,
+    operation: state.activeOperation,
+  });
 }
 
 function transitionToBattleMode(options = {}) {
-  runScreenTransition(() => enterBattleMode(options));
+  const showBriefing = options.showBriefing ?? state.mode === "strategy";
+  runScreenTransition(() => {
+    updateGameFlow(FLOW_EVENT.START_BATTLE);
+    enterBattleMode({
+      ...options,
+      waitForStart: showBriefing ? true : options.waitForStart,
+      showBriefing,
+    });
+  });
 }
 
 function transitionToStrategyMode() {
-  runScreenTransition(enterStrategyMode);
+  runScreenTransition(() => {
+    updateGameFlow(FLOW_EVENT.FINISH_BATTLE);
+    clearStrategySelection();
+    enterStrategyMode();
+  });
 }
 
 function transitionToBattleReset() {
@@ -493,14 +647,23 @@ function resetBattle(options = {}) {
   controlsDialog.hidden = true;
   selectionBox.hidden = true;
   panelSelectionBox.hidden = true;
-  startScreen.hidden = state.started;
+  startScreen.hidden = state.started || options.showBriefing;
+  battleBriefing.hidden = !options.showBriefing;
+  if (options.showBriefing) {
+    const source = strategySpot(operation?.sourceId);
+    const target = strategySpot(operation?.targetId);
+    const counts = teamCounts(state.battle);
+    battleBriefingSummary.textContent = source && target
+      ? `${source.name} → ${target.name}　味方 ${counts.ally} / 敵 ${counts.enemy}`
+      : `味方 ${counts.ally} / 敵 ${counts.enemy}`;
+    requestAnimationFrame(() => beginBattleButton.focus());
+  }
   buildFormationPanel();
   syncPauseButton();
   syncControlModeButton();
   syncFormationStyleButton();
   battleMessage.textContent = state.started ? "ENGAGED" : "READY";
   updateHud();
-  exposeDebugState();
 }
 
 function startBattle() {
@@ -513,6 +676,17 @@ function startBattle() {
     battleMessage.textContent = "ENGAGED";
     updateHud();
   });
+}
+
+function beginBriefedBattle() {
+  if (state.mode !== "battle" || state.started || battleBriefing.hidden || state.transitioning) return;
+  state.started = true;
+  state.lastTime = performance.now();
+  battleBriefing.hidden = true;
+  syncPauseButton();
+  battleMessage.textContent = "ENGAGED";
+  updateHud();
+  canvas.focus?.();
 }
 
 async function runScreenTransition(action, options = {}) {
@@ -625,11 +799,38 @@ function handleKeyboard(event) {
     if (["Enter", "Space", "Escape"].includes(event.code)) event.preventDefault();
     return;
   }
+  if (!titleScreen.hidden) {
+    if (event.code === "Enter" && !event.repeat) {
+      event.preventDefault();
+      openScenarioScreen();
+    }
+    return;
+  }
+  if (!scenarioScreen.hidden) {
+    if (event.code === "Enter" && !event.repeat) {
+      event.preventDefault();
+      startSelectedScenario();
+    } else if (event.code === "Escape") {
+      event.preventDefault();
+      runScreenTransition(showTitleScreen);
+    }
+    return;
+  }
   if (event.code === "Space") {
     event.preventDefault();
   }
+  if (!battleBriefing.hidden) {
+    if (event.code === "Enter" && !event.repeat) {
+      event.preventDefault();
+      beginBriefedBattle();
+    }
+    return;
+  }
   if (!invasionDialog.hidden) {
-    if (event.code === "Escape") {
+    if (event.code === "Enter" && !event.repeat) {
+      event.preventDefault();
+      confirmPendingInvasion();
+    } else if (event.code === "Escape") {
       event.preventDefault();
       cancelPendingInvasion();
     }
@@ -670,10 +871,9 @@ function frame(now) {
   state.lastTime = now;
   if (state.mode === "battle" && state.started && !state.paused) updateBattle(state.battle, delta);
   updateCamera(delta);
-  if (state.mode === "strategy") {
-    updateStrategyHud();
-  } else {
+  if (state.mode === "battle" && now - state.lastBattleHudUpdate >= BATTLE_HUD_INTERVAL_MS) {
     updateHud();
+    state.lastBattleHudUpdate = now;
   }
   render();
   requestAnimationFrame(frame);
@@ -682,6 +882,13 @@ function frame(now) {
 function render() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
+  if (state.mode === "strategy") {
+    const renderKey = strategyRenderKey(width, height);
+    if (renderKey === state.strategyRenderKey) return;
+    state.strategyRenderKey = renderKey;
+  } else {
+    state.strategyRenderKey = null;
+  }
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#000000";
@@ -702,6 +909,19 @@ function render() {
     drawCommandPreview();
   }
   ctx.restore();
+}
+
+function strategyRenderKey(width, height) {
+  const owners = state.strategy.spots.map(spot => spot.owner).join(",");
+  return [
+    width,
+    height,
+    state.camera.centerX,
+    state.camera.centerY,
+    state.camera.scale,
+    state.strategy.selectedSpotId,
+    owners,
+  ].join("|");
 }
 
 function drawStrategyMap() {
@@ -903,6 +1123,7 @@ function drawUnit(unit) {
   const image = unit.type === "artillery"
     ? state.images.allyArtillery
     : state.images[unit.team];
+
   ctx.save();
   ctx.translate(unit.x, unit.y);
   if (unit.facing === "right") ctx.scale(-1, 1);
@@ -912,6 +1133,7 @@ function drawUnit(unit) {
   if (state.selectedUnitIds.has(unit.id)) drawSelectionMarker(unit);
 
   const hpRatio = unit.hp / unit.maxHp;
+  drawUnitTypeIcon(unit, unit.x - HP_BAR_WIDTH / 2 - 18, unit.y - 78, 16);
   ctx.fillStyle = "#000000";
   ctx.fillRect(unit.x - HP_BAR_WIDTH / 2 - 2, unit.y - 74, HP_BAR_WIDTH + 4, 12);
   ctx.strokeStyle = "#ffffff";
@@ -919,6 +1141,39 @@ function drawUnit(unit) {
   ctx.strokeRect(unit.x - HP_BAR_WIDTH / 2 - 1.5, unit.y - 73.5, HP_BAR_WIDTH + 3, 11);
   ctx.fillStyle = unit.team === "ally" ? "#ffffff" : "#db0814";
   ctx.fillRect(unit.x - HP_BAR_WIDTH / 2 + 2, unit.y - 70, (HP_BAR_WIDTH - 4) * hpRatio, 4);
+}
+
+function drawUnitTypeIcon(unit, x, y, size) {
+  const teamColor = unit.team === "ally" ? "#ffffff" : "#db0814";
+  const centerX = x + size / 2;
+  const centerY = y + size / 2;
+
+  ctx.save();
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(x - 2, y - 2, size + 4, size + 4);
+  ctx.fillStyle = teamColor;
+  ctx.fillRect(x, y, size, size);
+  ctx.strokeStyle = unit.team === "ally" ? "#000000" : "#ffffff";
+  ctx.lineWidth = 2;
+
+  if (unit.type === "artillery") {
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 4.5, 0, Math.PI * 2);
+    ctx.moveTo(centerX - 7, centerY);
+    ctx.lineTo(centerX + 7, centerY);
+    ctx.moveTo(centerX, centerY - 7);
+    ctx.lineTo(centerX, centerY + 7);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - 6);
+    ctx.lineTo(centerX + 6, centerY + 5);
+    ctx.lineTo(centerX - 6, centerY + 5);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 function drawSelectionMarker(unit) {
@@ -1074,6 +1329,7 @@ function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
   canvas.width = Math.max(1, Math.round(rect.width * devicePixelRatio));
   canvas.height = Math.max(1, Math.round(rect.height * devicePixelRatio));
+  state.strategyRenderKey = null;
   if (state.camera) {
     clampCamera(state.camera, rect.width, rect.height);
     zoomLevel.textContent = `${Math.round(state.camera.scale * 100)}%`;
@@ -1110,7 +1366,7 @@ function clearEdgeScroll() {
 function updateCamera(delta) {
   if (
     state.mode !== "strategy" &&
-    (!state.started || state.paused || state.battle?.winner)
+    (!state.started || state.battle?.winner)
   ) return;
   if (!state.camera || (!state.edgeScroll.x && !state.edgeScroll.y)) return;
   moveCamera(
@@ -1198,7 +1454,6 @@ function updateHud() {
   } else if (!state.paused) {
     battleMessage.textContent = battleLabel();
   }
-  exposeDebugState();
 }
 
 function updateBattleResult(counts) {
@@ -1226,41 +1481,7 @@ function resolveBattleOperation(winner) {
   const operation = state.activeOperation;
   if (!operation || state.resolvedBattleOperation) return;
   state.resolvedBattleOperation = true;
-
-  const source = strategySpot(operation.sourceId);
-  const target = strategySpot(operation.targetId);
-  if (!source || !target) return;
-
-  const deployedIds = new Set(operation.unitIds);
-  const survivingAllyIds = new Set(
-    state.battle.units
-      .filter(unit => unit.team === "ally" && unit.alive)
-      .map(unit => unit.id)
-  );
-  const deployedUnits = source.units.filter(unit => deployedIds.has(unit.id));
-  source.units = source.units.filter(unit => !deployedIds.has(unit.id));
-
-  if (winner === "ally") {
-    const survivors = deployedUnits
-      .filter(unit => survivingAllyIds.has(unit.id))
-      .map(unit => ({
-        ...unit,
-        spotId: target.id,
-        formationId: unit.formationId.replace(source.id, target.id),
-      }));
-    target.owner = "player";
-    target.units = survivors;
-    state.strategy.selectedSpotId = target.id;
-    state.strategy.selectedSourceId = target.id;
-    state.strategy.selectedTargetId = null;
-    state.strategy.selectedUnitIds.clear();
-    state.strategy.message = `${target.name}を占領しました`;
-  } else {
-    state.strategy.selectedSpotId = source.id;
-    state.strategy.selectedTargetId = null;
-    state.strategy.selectedUnitIds.clear();
-    state.strategy.message = `${target.name}への侵攻は失敗しました`;
-  }
+  resolveStrategyBattle(state.strategy, operation, state.battle.units, winner);
 }
 
 function formatBattleTime(seconds) {
@@ -1658,27 +1879,8 @@ function unitImageSrc(unit) {
 function hireStrategyUnit(event) {
   const button = event.target.closest("[data-hire-unit]");
   if (!button) return;
-  const spot = strategySpot(button.dataset.spotId);
-  const catalog = STRATEGY_UNIT_CATALOG[button.dataset.hireUnit];
-  if (!spot || spot.owner !== "player" || !catalog) return;
-  if (state.strategy.funds.player < catalog.cost) return;
-
-  state.strategy.funds.player -= catalog.cost;
-  const unitNumber = state.strategy.nextUnitId++;
-  spot.units.push({
-    id: `${spot.id}-hired-${catalog.type}-${unitNumber}`,
-    team: "ally",
-    type: catalog.type,
-    role: catalog.role,
-    spotId: spot.id,
-    formationId: `${spot.id}-hired-${catalog.type}`,
-    hp: 1,
-    maxHp: 1,
-    alive: true,
-  });
-  state.strategy.message = `${spot.name}で${catalog.label}を雇用しました`;
-  state.strategy.selectedSpotId = spot.id;
-  state.strategy.selectedSourceId = spot.id;
+  const unit = hireUnit(state.strategy, button.dataset.spotId, button.dataset.hireUnit);
+  if (!unit) return;
   updateStrategyHud();
   updateStrategySpotPanels();
 }
@@ -1727,12 +1929,17 @@ function closeStrategySpotPanel(spotId) {
   if (state.strategy.selectedSpotId === spotId) state.strategy.selectedSpotId = null;
   if (state.strategy.selectedSourceId === spotId) {
     state.strategy.selectedSourceId = null;
+    state.strategy.selectedTargetId = null;
     state.strategy.selectedUnitIds.clear();
   }
   if (state.strategy.selectedTargetId === spotId) state.strategy.selectedTargetId = null;
-  state.strategy.message = state.strategy.selectedSourceId
-    ? state.strategy.message
-    : "自領地を選択してください";
+  state.strategy.message = !state.strategy.selectedSourceId
+    ? "自領地を選択してください"
+    : !state.strategy.selectedTargetId
+      ? "侵攻先の領地を選択してください"
+      : state.strategy.selectedUnitIds.size > 0
+        ? "選択したユニットを侵攻先へドラッグ＆ドロップしてください"
+        : "出撃するユニットを選択してください";
   updateStrategyHud();
   updateStrategySpotPanels();
 }
@@ -1776,8 +1983,12 @@ function toggleStrategyFormationSelection(spotId, formationId) {
 
   state.strategy.selectedSpotId = spot.id;
   state.strategy.message = state.strategy.selectedUnitIds.size > 0
-    ? "選択部隊を敵情報パネルへドラッグしてください"
-    : "作戦に参加する部隊を選択してください";
+    ? state.strategy.selectedTargetId
+      ? "選択したユニットを侵攻先へドラッグ＆ドロップしてください"
+      : "侵攻先の領地を選択してください"
+    : state.strategy.selectedTargetId
+      ? "出撃するユニットを選択してください"
+      : "侵攻先の領地を選択してください";
   updateStrategyHud();
   updateStrategySpotPanels();
 }
@@ -1794,7 +2005,9 @@ function toggleStrategyUnitSelection(spotId, ids, additive = true) {
   const nextIds = ids.filter(id => eligible.has(id));
   if (!additive && isEntireStrategyGroupSelected(nextIds)) {
     state.strategy.selectedUnitIds.clear();
-    state.strategy.message = "作戦に参加する部隊を選択してください";
+    state.strategy.message = state.strategy.selectedTargetId
+      ? "出撃するユニットを選択してください"
+      : "侵攻先の領地を選択してください";
     updateStrategyHud();
     updateStrategySpotPanels();
     return;
@@ -1810,8 +2023,12 @@ function toggleStrategyUnitSelection(spotId, ids, additive = true) {
   }
   state.strategy.selectedSpotId = spot.id;
   state.strategy.message = state.strategy.selectedUnitIds.size > 0
-    ? "選択部隊を敵情報パネルへドラッグしてください"
-    : "作戦に参加する部隊を選択してください";
+    ? state.strategy.selectedTargetId
+      ? "選択したユニットを侵攻先へドラッグ＆ドロップしてください"
+      : "侵攻先の領地を選択してください"
+    : state.strategy.selectedTargetId
+      ? "出撃するユニットを選択してください"
+      : "侵攻先の領地を選択してください";
   updateStrategyHud();
   updateStrategySpotPanels();
 }
@@ -1839,17 +2056,18 @@ function selectStrategyUnitIds(spotId, ids, additive = false) {
   }
   state.strategy.selectedSpotId = spot.id;
   state.strategy.message = state.strategy.selectedUnitIds.size > 0
-    ? "選択部隊を敵情報パネルへドラッグしてください"
-    : "作戦に参加する部隊を選択してください";
+    ? state.strategy.selectedTargetId
+      ? "選択したユニットを侵攻先へドラッグ＆ドロップしてください"
+      : "侵攻先の領地を選択してください"
+    : state.strategy.selectedTargetId
+      ? "出撃するユニットを選択してください"
+      : "侵攻先の領地を選択してください";
   updateStrategyHud();
   updateStrategySpotPanels();
 }
 
 function selectedStrategyUnits() {
-  const source = strategySpot(state.strategy.selectedSourceId);
-  if (!source) return [];
-  const selectedIds = state.strategy.selectedUnitIds;
-  return source.units.filter(unit => unit.alive && selectedIds.has(unit.id));
+  return getSelectedStrategyUnits(state.strategy);
 }
 
 function syncStrategySelectedForces() {
@@ -1968,12 +2186,23 @@ function cancelPanelSelection(event) {
 
 function startStrategyPanelSelection(event) {
   if (event.button !== 0 || state.mode !== "strategy") return;
-  if (event.target.closest("[data-hire-unit], [data-close-spot-panel], [data-strategy-select-scope]")) return;
+  if (event.target.closest("[data-hire-unit], [data-close-spot-panel]")) return;
   const panel = event.target.closest(".strategy-spot-panel");
   const unitsPanel = event.target.closest(".strategy-units-panel");
   if (!panel || !unitsPanel) return;
   const spot = strategySpot(panel.dataset.spotId);
   if (!spot || spot.owner !== "player") return;
+  const allButton = event.target.closest("[data-strategy-select-scope='all']");
+  if (allButton) {
+    const ids = spot.units.filter(unit => unit.alive).map(unit => unit.id);
+    if (ids.length === 0) return;
+    startStrategyForceDrag(event, panel, {
+      type: "all",
+      spotId: spot.id,
+      unitIds: ids,
+    });
+    return;
+  }
   const formationButton = event.target.closest("[data-strategy-formation]");
   if (formationButton) {
     const units = spot.units.filter(unit =>
@@ -2110,7 +2339,7 @@ function strategyUnitCardsInClientBounds(panel, bounds) {
 function startHudPanelDrag(event) {
   if (event.button !== 0) return;
   if (event.target.closest?.("button")) return;
-  const panel = event.currentTarget.closest?.(".invasion-dialog") ?? event.currentTarget;
+  const panel = event.currentTarget;
   const strategySpotPanel = event.target.closest?.(".strategy-spot-panel");
   let captureElement = panel;
   if (strategySpotPanel) {
@@ -2296,7 +2525,6 @@ function toggleUnitSelection(ids, additive = false) {
   if (!additive && isEntireGroupSelected(nextIds)) {
     state.selectedUnitIds.clear();
     syncFormationPanel();
-    exposeDebugState();
     return;
   }
   selectUnitIds(nextIds, additive);
@@ -2314,7 +2542,6 @@ function selectUnitIds(ids, additive = false) {
     }
   }
   syncFormationPanel();
-  exposeDebugState();
 }
 
 function aliveAllyIds() {
@@ -2460,7 +2687,7 @@ function selectedLivingAllies() {
 function startStrategyForceDrag(event, captureElement = strategySelectedForces, clickToggle = null) {
   if (event.button !== 0 || state.mode !== "strategy" || state.strategy.phase !== "player") return;
   const units = selectedStrategyUnits();
-  if (units.length === 0) return;
+  if (units.length === 0 && clickToggle?.type !== "all") return;
   state.strategyForceDrag = {
     pointerId: event.pointerId,
     captureElement,
@@ -2469,6 +2696,7 @@ function startStrategyForceDrag(event, captureElement = strategySelectedForces, 
     startClientY: event.clientY,
     currentClientX: event.clientX,
     currentClientY: event.clientY,
+    ghost: null,
     moved: false,
   };
   captureElement.setPointerCapture?.(event.pointerId);
@@ -2490,11 +2718,41 @@ function updateStrategyForceDrag(event) {
     event.clientX - drag.startClientX,
     event.clientY - drag.startClientY
   ) >= 4;
+  if (drag.moved && drag.clickToggle?.type === "all" && !drag.selectionPrepared) {
+    selectStrategyUnitIds(drag.clickToggle.spotId, drag.clickToggle.unitIds, false);
+    drag.selectionPrepared = true;
+  }
+  if (drag.moved && !drag.ghost) {
+    drag.ghost = createStrategyDragGhost(selectedStrategyUnits());
+    document.body.append(drag.ghost);
+  }
   const dropPanel = invasionDropPanelAt(event);
+  if (drag.ghost) {
+    drag.ghost.classList.toggle("is-valid", Boolean(dropPanel));
+    drag.ghost.style.transform = `translate3d(${event.clientX + 18}px, ${event.clientY + 18}px, 0)`;
+  }
   for (const panel of state.strategy.openSpotPanels.values()) {
     panel.classList.toggle("is-drop-hover", panel === dropPanel);
   }
   event.preventDefault();
+}
+
+function createStrategyDragGhost(units) {
+  const ghost = document.createElement("div");
+  ghost.className = "strategy-drag-ghost";
+  ghost.setAttribute("aria-hidden", "true");
+
+  for (const unit of units.slice(0, 3)) {
+    const image = document.createElement("img");
+    image.src = unitImageSrc(unit);
+    image.alt = "";
+    ghost.append(image);
+  }
+
+  const count = document.createElement("b");
+  count.textContent = `×${units.length}`;
+  ghost.append(count);
+  return ghost;
 }
 
 function finishStrategyForceDrag(event) {
@@ -2507,23 +2765,36 @@ function finishStrategyForceDrag(event) {
       toggleStrategyUnitSelection(clickToggle.spotId, [clickToggle.unitId], true);
     } else if (clickToggle?.type === "formation") {
       toggleStrategyFormationSelection(clickToggle.spotId, clickToggle.formationId);
+    } else if (clickToggle?.type === "all") {
+      toggleStrategySelectionBy(clickToggle.spotId, () => true, false);
     }
+    suppressNextStrategyPanelClick();
     event.preventDefault();
     return;
   }
   const dropPanel = invasionDropPanelAt(event);
   const targetId = dropPanel?.dataset.spotId ?? null;
   cancelStrategyForceDrag(event);
+  suppressNextStrategyPanelClick();
   if (!targetId) return;
   state.strategy.selectedTargetId = targetId;
-  openInvasionConfirmation(targetId);
+  beginInvasion(targetId);
   event.preventDefault();
 }
 
+function suppressNextStrategyPanelClick() {
+  state.suppressPanelClick = true;
+  setTimeout(() => {
+    state.suppressPanelClick = false;
+  }, 0);
+}
+
 function cancelStrategyForceDrag(event) {
-  if (state.strategyForceDrag && event?.pointerId != null) {
-    state.strategyForceDrag.captureElement?.releasePointerCapture?.(event.pointerId);
+  const drag = state.strategyForceDrag;
+  if (drag && event?.pointerId != null) {
+    drag.captureElement?.releasePointerCapture?.(event.pointerId);
   }
+  drag?.ghost?.remove();
   state.strategyForceDrag = null;
   strategySelectedForces.classList.remove("is-dragging");
   for (const card of document.querySelectorAll(".strategy-unit-card.is-dragging")) {
@@ -2546,38 +2817,16 @@ function invasionDropPanelAt(event) {
   return canInvadeTarget(source, target) ? panel : null;
 }
 
-function openInvasionConfirmation(targetId = state.strategy.selectedTargetId) {
-  const source = strategySpot(state.strategy.selectedSourceId);
-  const target = strategySpot(targetId);
-  const alliedUnits = selectedStrategyUnits();
-  if (!canInvadeTarget(source, target) || alliedUnits.length === 0) return;
-
-  state.pendingOperation = {
-    sourceId: source.id,
-    targetId: target.id,
-    unitIds: alliedUnits.map(unit => unit.id),
-    alliedUnits: alliedUnits.map(cloneStrategyUnitForBattle),
-    enemyUnits: target.units.filter(unit => unit.alive).map(cloneStrategyUnitForBattle),
-  };
-  invasionSummary.textContent = `${source.name}から${target.name}へ ${alliedUnits.length} 部隊を投入します`;
+function beginInvasion(targetId = state.strategy.selectedTargetId) {
+  const operation = createInvasionOperation(state.strategy, targetId);
+  if (!operation) return;
+  state.pendingOperation = operation;
+  const source = strategySpot(operation.sourceId);
+  const target = strategySpot(operation.targetId);
+  invasionTitle.textContent = `${target.name}へ侵攻しますか？`;
+  invasionSummary.textContent = `${source.name} → ${target.name}　味方 ${operation.alliedUnits.length} / 敵 ${operation.enemyUnits.length}`;
   invasionDialog.hidden = false;
-  invasionDialog.style.left = "";
-  invasionDialog.style.top = "";
-  invasionDialog.style.right = "";
-  invasionDialog.style.bottom = "";
-  invasionDialog.style.transform = "";
   confirmInvasionButton.focus();
-}
-
-function cloneStrategyUnitForBattle(unit) {
-  return {
-    id: unit.id,
-    team: unit.team,
-    type: unit.type,
-    role: unit.role,
-    formationId: unit.formationId,
-    spotId: unit.spotId,
-  };
 }
 
 function confirmPendingInvasion() {
@@ -2585,10 +2834,11 @@ function confirmPendingInvasion() {
   if (!operation || state.transitioning) return;
   state.pendingOperation = null;
   invasionDialog.hidden = true;
-  transitionToBattleMode({ operation, waitForStart: false });
+  transitionToBattleMode({ operation, waitForStart: true, showBriefing: true });
 }
 
 function cancelPendingInvasion() {
+  if (!state.pendingOperation) return;
   state.pendingOperation = null;
   invasionDialog.hidden = true;
   state.strategy.message = "侵攻を中止しました";
@@ -2774,7 +3024,7 @@ function startStrategySelection(event) {
 }
 
 function strategySpot(id) {
-  return state.strategy.spots.find(spot => spot.id === id) ?? null;
+  return getStrategySpot(state.strategy, id);
 }
 
 function strategySpotAt(x, y) {
@@ -2796,9 +3046,12 @@ function selectStrategySpot(spot) {
   openStrategySpotPanel(spot);
 
   if (spot.owner === "player") {
-    if (state.strategy.selectedSourceId !== spot.id) state.strategy.selectedUnitIds.clear();
+    if (state.strategy.selectedSourceId !== spot.id) {
+      state.strategy.selectedUnitIds.clear();
+      state.strategy.selectedTargetId = null;
+    }
     state.strategy.selectedSourceId = spot.id;
-    state.strategy.message = "作戦に参加する部隊を選択してください";
+    state.strategy.message = "侵攻先の領地を選択してください";
     updateStrategyHud();
     updateStrategySpotPanels();
     return;
@@ -2811,8 +3064,8 @@ function selectStrategySpot(spot) {
   ) {
     state.strategy.selectedTargetId = spot.id;
     state.strategy.message = state.strategy.selectedUnitIds.size > 0
-      ? "選択部隊を敵情報パネルへドラッグしてください"
-      : "先に自領地で作戦部隊を選択してください";
+      ? "選択したユニットを侵攻先へドラッグ＆ドロップしてください"
+      : "出撃するユニットを選択してください";
   } else if (spot.owner !== "player") {
     state.strategy.selectedTargetId = null;
     state.strategy.message = "隣接する自領地から選択してください";
@@ -2822,10 +3075,7 @@ function selectStrategySpot(spot) {
 }
 
 function areStrategySpotsLinked(firstId, secondId) {
-  return state.strategy.links.some(link =>
-    (link.from === firstId && link.to === secondId) ||
-    (link.from === secondId && link.to === firstId)
-  );
+  return areSpotsLinked(state.strategy, firstId, secondId);
 }
 
 function invadeSelectedSpot() {
@@ -2844,12 +3094,7 @@ function invadeSelectedSpot() {
 }
 
 function canInvadeTarget(source, target) {
-  return Boolean(
-    source?.owner === "player" &&
-    target &&
-    target.owner !== "player" &&
-    areStrategySpotsLinked(source.id, target.id)
-  );
+  return canInvadeStrategyTarget(state.strategy, source, target);
 }
 
 function clearStrategySelection() {
@@ -2860,6 +3105,7 @@ function clearStrategySelection() {
   state.strategy.selectedUnitIds.clear();
   state.pendingOperation = null;
   invasionDialog.hidden = true;
+  battleBriefing.hidden = true;
   state.strategy.message = "自領地を選択してください";
   updateStrategyHud();
   updateStrategySpotPanels();
@@ -2867,6 +3113,10 @@ function clearStrategySelection() {
 
 function endStrategyTurn() {
   if (state.strategy.phase !== "player") return;
+  if (state.strategy.spots.every(spot => spot.owner === "player")) {
+    showStrategyClearResult();
+    return;
+  }
   state.strategy.phase = "enemy";
   state.strategy.message = "敵ターン: 現在は行動なし";
   updateStrategyHud();
@@ -2877,6 +3127,22 @@ function endStrategyTurn() {
     state.strategy.message = "自領地を選択してください";
     clearStrategySelection();
   }, 500);
+}
+
+function showStrategyClearResult() {
+  updateGameFlow(FLOW_EVENT.CLEAR_SCENARIO);
+  state.strategyCleared = true;
+  closeStrategyTransientUi();
+  battleMessage.textContent = "SCENARIO CLEAR";
+  resultTitle.textContent = "SCENARIO CLEAR";
+  resultTitle.classList.remove("is-defeat");
+  resultAllies.textContent = String(state.strategy.spots.length);
+  resultEnemies.textContent = "0";
+  resultTime.textContent = `TURN ${state.strategy.turn}`;
+  resultRestartButton.textContent = "RETURN SCENARIOS";
+  battleResult.hidden = false;
+  pauseButton.disabled = true;
+  requestAnimationFrame(() => resultRestartButton.focus());
 }
 
 function updateStrategyHud() {
@@ -2898,102 +3164,6 @@ function updateStrategyHud() {
   pauseButton.disabled = state.strategy.phase !== "player";
   pauseButton.textContent = state.strategy.phase === "player" ? "END TURN" : "WAIT";
   zoomLevel.textContent = `${Math.round(state.camera.scale * 100)}%`;
-  exposeDebugState();
-}
-
-function exposeDebugState() {
-  const debugState = {
-    ready: Boolean(state.map && state.battle && state.strategy),
-    mode: state.mode,
-    started: state.started,
-    paused: state.paused,
-    formationStyle: state.formationStyle,
-    elapsed: state.battle?.elapsed ?? 0,
-    winner: state.battle?.winner ?? null,
-    camera: state.camera ? {
-      centerX: Math.round(state.camera.centerX),
-      centerY: Math.round(state.camera.centerY),
-      scale: Number(state.camera.scale.toFixed(3)),
-    } : null,
-    counts: state.battle ? teamCounts(state.battle) : null,
-    shells: state.battle?.shells.map(shell => ({
-      id: shell.id,
-      type: shell.type,
-      x: Math.round(shell.x),
-      y: Math.round(shell.y),
-      progress: Number((shell.progress ?? 0).toFixed(3)),
-    })) ?? [],
-    fireTarget: state.battle?.fireTarget ? {
-      x: Math.round(state.battle.fireTarget.x),
-      y: Math.round(state.battle.fireTarget.y),
-    } : null,
-    explosions: state.battle?.explosions?.map(explosion => ({
-      id: explosion.id,
-      age: Number(explosion.age.toFixed(3)),
-      frame: Math.floor(explosion.age / state.battle.rules.explosionFrameDuration),
-    })) ?? [],
-    units: state.battle?.units.map(unit => ({
-      id: unit.id,
-      team: unit.team,
-      type: unit.type,
-      role: unit.role,
-      formationId: unit.formationId,
-      x: Math.round(unit.x),
-      y: Math.round(unit.y),
-      hp: unit.hp,
-      alive: unit.alive,
-      state: unit.state,
-      facing: unit.facing,
-      command: unit.command?.type ?? "",
-    })) ?? [],
-    strategy: state.strategy ? {
-      turn: state.strategy.turn,
-      phase: state.strategy.phase,
-      selectedSpot: state.strategy.selectedSpotId,
-      source: state.strategy.selectedSourceId,
-      target: state.strategy.selectedTargetId,
-      ownCount: state.strategy.spots.filter(spot => spot.owner === "player").length,
-      neutralCount: state.strategy.spots.filter(spot => spot.owner === "neutral").length,
-    } : null,
-  };
-  window.__RTS_DEBUG__ = debugState;
-  canvas.dataset.ready = String(debugState.ready);
-  canvas.dataset.mode = debugState.mode;
-  canvas.dataset.started = String(debugState.started);
-  canvas.dataset.formationStyle = debugState.formationStyle;
-  canvas.dataset.elapsed = debugState.elapsed.toFixed(2);
-  canvas.dataset.winner = debugState.winner ?? "";
-  canvas.dataset.shells = String(debugState.shells.length);
-  canvas.dataset.artilleryUnits = String(
-    debugState.units.filter(unit => unit.type === "artillery" && unit.alive).length
-  );
-  const artilleryShells = debugState.shells.filter(shell => shell.type === "artillery");
-  canvas.dataset.artilleryShells = String(artilleryShells.length);
-  canvas.dataset.artilleryProgress = String(artilleryShells[0]?.progress ?? "");
-  canvas.dataset.selectedUnits = [...state.selectedUnitIds].join(",");
-  canvas.dataset.selectedCount = String(state.selectedUnitIds.size);
-  canvas.dataset.fireTarget = debugState.fireTarget
-    ? `${debugState.fireTarget.x},${debugState.fireTarget.y}`
-    : "";
-  canvas.dataset.explosions = String(debugState.explosions.length);
-  canvas.dataset.explosionFrame = String(debugState.explosions[0]?.frame ?? "");
-  canvas.dataset.minimumHp = String(
-    debugState.units.reduce((minimum, unit) => Math.min(minimum, unit.hp), 100)
-  );
-  canvas.dataset.unitStates = [...new Set(debugState.units.map(unit => unit.state))].join(",");
-  canvas.dataset.moveCommands = String(
-    debugState.units.filter(unit => unit.command === "move").length
-  );
-  canvas.dataset.cameraX = String(debugState.camera?.centerX ?? "");
-  canvas.dataset.cameraY = String(debugState.camera?.centerY ?? "");
-  canvas.dataset.cameraScale = String(debugState.camera?.scale ?? "");
-  canvas.dataset.strategyTurn = String(debugState.strategy?.turn ?? "");
-  canvas.dataset.strategyPhase = debugState.strategy?.phase ?? "";
-  canvas.dataset.strategySelectedSpot = debugState.strategy?.selectedSpot ?? "";
-  canvas.dataset.strategySource = debugState.strategy?.source ?? "";
-  canvas.dataset.strategyTarget = debugState.strategy?.target ?? "";
-  canvas.dataset.strategyOwnCount = String(debugState.strategy?.ownCount ?? "");
-  canvas.dataset.strategyNeutralCount = String(debugState.strategy?.neutralCount ?? "");
 }
 
 async function fetchJson(url) {

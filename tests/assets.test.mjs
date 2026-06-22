@@ -15,6 +15,13 @@ test("battle sprites use the WebP asset set", async () => {
     access(new URL("../assets/spot/spot2.webp", import.meta.url)),
     access(new URL("../assets/flag/flag1.png", import.meta.url)),
     access(new URL("../assets/spot/strategy.json", import.meta.url)),
+    access(new URL("../assets/title/title.webp", import.meta.url)),
+    access(new URL("../assets/title/easy.webp", import.meta.url)),
+    access(new URL("../assets/title/normal.webp", import.meta.url)),
+    access(new URL("../assets/title/hard.webp", import.meta.url)),
+    access(new URL("../assets/title/continue.webp", import.meta.url)),
+    access(new URL("../assets/title/tool.webp", import.meta.url)),
+    access(new URL("../assets/pre/pre1.webp", import.meta.url)),
     ...Array.from(
       { length: 9 },
       (_, index) => access(new URL(`../assets/effect/ex${index + 1}.webp`, import.meta.url))
