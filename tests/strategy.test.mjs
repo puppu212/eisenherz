@@ -26,6 +26,18 @@ test("strategy state builds the initial formations and route graph", async () =>
   assert.equal(areStrategySpotsLinked(strategy, source.id, target.id), true);
 });
 
+test("legacy player ownership is normalized to the default faction", () => {
+  const strategy = createStrategyState({
+    width: 100,
+    height: 100,
+    spots: [{ id: "legacy", name: "LEGACY", x: 50, y: 50, owner: "player", units: [] }],
+    links: [],
+  });
+
+  assert.equal(strategy.spots[0].factionId, "deutschland");
+  assert.equal(strategy.spots[0].owner, "player");
+});
+
 test("hiring spends funds and adds a unit to an owned spot", async () => {
   const strategy = await createTestStrategy();
   const source = strategy.spots.find(spot => spot.id === "spot1");

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000">
   <title>EISENHERZ</title>
   <link rel="icon" href="./assets/icon/icon.ico" sizes="any">
-  <link rel="stylesheet" href="./styles.css?v=23">
+  <link rel="stylesheet" href="./styles.css?v=28">
 </head>
 <body>
   <main class="game-shell">
@@ -21,6 +21,7 @@
         <span class="team-count enemy"><b id="enemy-count">1</b> <span id="enemy-label">NEUTRAL</span></span>
       </div>
       <div class="controls">
+        <button id="header-back" type="button" hidden>BACK</button>
         <button id="toggle-pause" type="button" aria-pressed="false">END TURN</button>
       </div>
     </header>
@@ -179,6 +180,29 @@
         <div id="strategy-selected-forces" class="strategy-selected-forces" hidden></div>
         <p id="strategy-message" class="strategy-message">自領地を選択してください</p>
       </aside>
+      <aside id="faction-panel" class="faction-panel hud-panel" aria-live="polite" hidden>
+        <p class="panel-kicker">SELECT FACTION</p>
+        <div id="faction-empty" class="faction-empty">
+          <h2 id="faction-empty-title">勢力を選択</h2>
+          <p id="faction-empty-message">マップ上の領地を選択してください。</p>
+        </div>
+        <div id="faction-detail" hidden>
+          <header class="faction-heading">
+            <img id="faction-portrait" src="./assets/character/char1.webp" alt="">
+            <div>
+              <span>FACTION</span>
+              <h2 id="faction-name">Deutschland</h2>
+              <p id="faction-commander">COMMANDER · ELISE</p>
+            </div>
+          </header>
+          <p id="faction-description" class="faction-description"></p>
+          <dl class="faction-stats">
+            <div><dt>TERRITORIES</dt><dd id="faction-territories">0</dd></div>
+            <div><dt>STATUS</dt><dd>PLAYABLE</dd></div>
+          </dl>
+          <button id="choose-faction" class="faction-choose" type="button">この勢力で開始</button>
+        </div>
+      </aside>
       <div id="strategy-spot-panels" class="strategy-spot-panels" aria-label="Opened spot panels"></div>
       <aside class="unit-status-panel hud-panel" aria-label="Allied unit status and selection">
         <header class="unit-status-heading">
@@ -216,6 +240,38 @@
         </div>
       </section>
       <section
+        id="faction-confirm-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="faction-confirm-title"
+        hidden
+      >
+        <p class="result-kicker">CONFIRM FACTION</p>
+        <h2 id="faction-confirm-title">この勢力で開始しますか？</h2>
+        <p id="faction-confirm-summary" class="invasion-summary"></p>
+        <div class="invasion-actions">
+          <button id="confirm-faction" type="button">開始</button>
+          <button id="cancel-faction" type="button">キャンセル</button>
+        </div>
+      </section>
+      <section
+        id="strategy-exit-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="strategy-exit-title"
+        hidden
+      >
+        <p class="result-kicker">LEAVE OPERATION</p>
+        <h2 id="strategy-exit-title">シナリオ選択へ戻りますか？</h2>
+        <p class="invasion-summary">現在の進行状況は破棄されます。</p>
+        <div class="invasion-actions">
+          <button id="confirm-strategy-exit" type="button">戻る</button>
+          <button id="cancel-strategy-exit" type="button">キャンセル</button>
+        </div>
+      </section>
+      <section
         id="battle-briefing"
         class="battle-briefing"
         role="dialog"
@@ -240,6 +296,6 @@
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=27"></script>
+  <script type="module" src="./src/app.js?v=37"></script>
 </body>
 </html>

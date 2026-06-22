@@ -98,6 +98,8 @@ h1 {
   font-family: var(--font-ui);
 }
 
+.battle-status[hidden] { display: none; }
+
 .team-count {
   display: flex;
   justify-content: center;
@@ -955,6 +957,69 @@ button:disabled:hover {
 
 .strategy-panel[hidden] { display: none; }
 
+.faction-panel {
+  position: absolute;
+  right: 22px;
+  top: 22px;
+  z-index: 3;
+  width: min(390px, calc(100vw - 44px));
+  border: 3px solid var(--white);
+  background: rgba(0, 0, 0, .96);
+  color: var(--white);
+}
+
+.faction-panel[hidden],
+#faction-detail[hidden],
+#faction-empty[hidden] { display: none; }
+
+.faction-panel > .panel-kicker {
+  margin: 0;
+  padding: 9px 12px;
+  border-bottom: 3px solid var(--white);
+  background: var(--red);
+  color: var(--white);
+}
+
+.faction-empty { padding: 24px; }
+.faction-empty h2 { margin: 0 0 8px; font-size: 28px; }
+.faction-empty p { margin: 0; color: #c9c9c9; font-size: 13px; }
+
+.faction-heading {
+  display: grid;
+  grid-template-columns: 106px minmax(0, 1fr);
+  min-height: 106px;
+}
+
+.faction-heading img {
+  display: block;
+  width: 106px;
+  height: 106px;
+  aspect-ratio: 1 / 1;
+  border-right: 3px solid var(--white);
+  border-bottom: 3px solid var(--white);
+  object-fit: cover;
+}
+
+.faction-heading > div {
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: 12px 15px;
+  border-bottom: 3px solid var(--white);
+}
+.faction-heading span { color: var(--red); font-size: 9px; font-weight: 900; letter-spacing: .18em; }
+.faction-heading h2 { overflow: hidden; margin: 3px 0; font-size: 30px; text-overflow: ellipsis; }
+.faction-heading p { margin: 0; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+
+.faction-description { min-height: 64px; margin: 0; padding: 14px 16px; border-bottom: 3px solid var(--white); font-size: 13px; line-height: 1.7; }
+.faction-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0; padding: 7px; }
+.faction-stats div { padding: 7px 9px; border: 2px solid var(--white); }
+.faction-stats dt { color: var(--red); font-size: 8px; font-weight: 900; letter-spacing: .13em; }
+.faction-stats dd { margin: 2px 0 0; font-size: 18px; font-weight: 900; }
+.faction-choose { width: calc(100% - 14px); margin: 0 7px 7px; background: var(--red); }
+.faction-choose:hover { background: var(--white); color: var(--black); }
+
 .strategy-spot-panels {
   position: absolute;
   inset: 0;
@@ -1758,6 +1823,11 @@ button:disabled:hover {
     left: 8px;
     bottom: 8px;
     width: min(320px, calc(100vw - 16px));
+  }
+  .faction-panel {
+    top: 8px;
+    right: 8px;
+    width: min(340px, calc(100vw - 16px));
   }
   .strategy-spot-panel {
     top: 8px;

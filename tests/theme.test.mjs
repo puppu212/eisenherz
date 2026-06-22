@@ -22,8 +22,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
-  assert.match(html, /href="\.\/styles\.css\?v=23"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=27"/);
+  assert.match(html, /href="\.\/styles\.css\?v=28"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=37"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -128,13 +128,17 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.command-mode-buttons\s*\{[^}]*grid-template-columns:\s*1fr 1fr/s);
   assert.match(css, /\.formation-mode-buttons\s*\{[^}]*grid-template-columns:\s*repeat\(3, 1fr\)/s);
   assert.match(css, /\.unit-status-panel\s*\{[^}]*top:\s*14px;[^}]*right:\s*14px;[^}]*width:\s*min\(390px, calc\(100vw - 28px\)\)/s);
+  assert.match(css, /\.faction-heading img\s*\{[^}]*display:\s*block;[^}]*aspect-ratio:\s*1 \/ 1;[^}]*border-right:\s*3px solid var\(--white\);[^}]*border-bottom:\s*3px solid var\(--white\)/s);
+  assert.match(css, /\.faction-heading > div\s*\{[^}]*align-self:\s*stretch;[^}]*border-bottom:\s*3px solid var\(--white\)/s);
   assert.match(css, /\.formation-units\s*\{[^}]*overflow-x:\s*auto/s);
   assert.match(css, /\.unit-card\.is-selected\s*\{[^}]*border-color:\s*var\(--red\)/s);
   assert.match(css, /\.selection-box\s*\{[^}]*border:\s*2px solid var\(--white\)/s);
   assert.match(css, /\.panel-selection-box\s*\{[^}]*border:\s*2px solid var\(--red\)/s);
   assert.match(css, /\.battle-status\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 148px minmax\(0, 1fr\)/s);
   assert.match(css, /\.battle-status\s*\{[^}]*width:\s*372px;[^}]*min-width:\s*372px;[^}]*max-width:\s*372px/s);
+  assert.match(css, /\.battle-status\[hidden\]\s*\{\s*display:\s*none;/);
   assert.match(css, /#battle-message\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*148px/s);
+  assert.match(app, /battleStatus\.hidden = screen === FLOW_SCREEN\.FACTION;/);
   assert.match(app, /\["Enter", "Space"\]\.includes\(event\.code\)/);
   assert.match(app, /if \(!controlsDialog\.hidden\)/);
   assert.match(app, /event\.code === "Escape"/);
@@ -175,9 +179,16 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /canvas\.addEventListener\("contextmenu", event => event\.preventDefault\(\)\)/);
   assert.match(app, /window\.addEventListener\("contextmenu", handleScreenBack\)/);
   assert.match(app, /function handleScreenBack\(event\)/);
+  assert.match(app, /!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION\]\.includes\(state\.flow\.screen\)/);
+  assert.doesNotMatch(app, /!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION, FLOW_SCREEN\.STRATEGY\]\.includes\(state\.flow\.screen\)/);
+  assert.match(app, /handleScreenBack\(event\)[\s\S]*?handleHeaderBack\(\);/);
+  assert.match(app, /state\.flow\.screen === FLOW_SCREEN\.SCENARIO\) \{\s*runScreenTransition\(showTitleScreen\);/s);
+  assert.match(app, /headerBackButton\.hidden = screen !== FLOW_SCREEN\.STRATEGY/);
+  assert.match(app, /pauseButton\.hidden = screen === FLOW_SCREEN\.FACTION/);
   assert.match(app, /runScreenTransition\(returnToScenarioScreen\)/);
-  assert.match(app, /function returnToScenarioScreen\(\) \{\s*resetStrategyState\(\);\s*updateGameFlow\(FLOW_EVENT\.RETURN_SCENARIOS\);\s*\}/s);
-  assert.match(app, /function resetStrategyState\(\) \{[\s\S]*?state\.strategy = createStrategyState\(state\.strategyData\)/s);
+  assert.match(app, /function returnToScenarioScreen\(\) \{\s*resetScenarioSessionState\(\);\s*updateGameFlow\(FLOW_EVENT\.RETURN_SCENARIOS\);\s*\}/s);
+  assert.match(app, /function resetScenarioSessionState\(\) \{[\s\S]*?state\.selectedFactionId = null;[\s\S]*?state\.strategyCleared = false;[\s\S]*?resetStrategyState\(\);[\s\S]*?resetBattle\(\{ waitForStart: true \}\);/s);
+  assert.match(app, /function resetStrategyState\(\) \{[\s\S]*?state\.strategy = createStrategyState\(state\.strategyData, state\.selectedFactionId \?\? "deutschland"\)/s);
   assert.match(app, /function enterStrategyMode\(\) \{\s*closeStrategyTransientUi\(\);/s);
   assert.match(app, /function transitionToStrategyMode\(\) \{[\s\S]*?clearStrategySelection\(\);[\s\S]*?enterStrategyMode\(\);/s);
   assert.match(app, /function closeStrategyTransientUi\(\) \{[\s\S]*?state\.strategy\.openSpotPanels\.clear\(\)/s);
@@ -191,8 +202,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /ctx\.rotate\(Math\.atan2\(dy, dx\) \+ Math\.PI\)/);
   assert.match(app, /if \(!state\.started\) \{\s*if \(event\.code === "Enter"\) \{\s*event\.preventDefault\(\);\s*startBattle\(\);/s);
   assert.match(app, /if \(state\.mode === "battle" && state\.started && !state\.paused\) updateBattle/);
-  assert.match(app, /state\.mode !== "strategy" &&\s*\(!state\.started \|\| state\.battle\?\.winner\)/);
-  assert.doesNotMatch(app, /state\.mode !== "strategy" &&\s*\(!state\.started \|\| state\.paused/);
+  assert.match(app, /!isStrategyMapMode\(\) &&\s*\(!state\.started \|\| state\.battle\?\.winner\)/);
+  assert.doesNotMatch(app, /!isStrategyMapMode\(\) &&\s*\(!state\.started \|\| state\.paused/);
   assert.match(app, /pauseButton\.textContent = state\.paused \? "RESUME" : "PAUSE"/);
   assert.match(app, /STRATEGY_ASSET_URLS/);
   assert.match(app, /function enterStrategyMode\(\)/);
@@ -202,10 +213,14 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function selectScenario\(scenarioId\)/);
   assert.match(
     app,
-    /async function runScenarioLoadingTransition\(\)[\s\S]*?screenTransition\.classList\.add\("is-visible"\);[\s\S]*?await delay\(SCREEN_TRANSITION_FADE_MS\);[\s\S]*?updateGameFlow\(FLOW_EVENT\.START_SCENARIO/s
+    /async function runScenarioLoadingTransition\(\)[\s\S]*?screenTransition\.classList\.add\("is-visible"\);[\s\S]*?await delay\(SCREEN_TRANSITION_FADE_MS\);[\s\S]*?updateGameFlow\(FLOW_EVENT\.CHOOSE_FACTION/s
   );
   assert.match(app, /function startSelectedScenario\(\)/);
   assert.match(app, /function drawStrategyMap\(\)/);
+  assert.match(app, /function trackStrategyHover\(event\)/);
+  assert.match(app, /function syncStrategyHover\(\)/);
+  assert.match(app, /const hoverScale = state\.strategyHoverScales\.get\(spot\.id\) \?\? 1/);
+  assert.match(app, /function updateStrategyHoverAnimation\(delta\)/);
   assert.match(app, /function invadeSelectedSpot\(\)/);
   assert.match(app, /function endStrategyTurn\(\) \{[\s\S]*?state\.strategy\.spots\.every\(spot => spot\.owner === "player"\)[\s\S]*?showStrategyClearResult\(\);[\s\S]*?return;/s);
   assert.match(app, /function showStrategyClearResult\(\) \{[\s\S]*?resultTitle\.textContent = "SCENARIO CLEAR"[\s\S]*?battleResult\.hidden = false;/s);
@@ -214,7 +229,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /const SCREEN_TRANSITION_HOLD_MS = 520;/);
   assert.match(app, /function runScreenTransition\(action, options = \{\}\)/);
   assert.match(app, /function createStrategyCamera\(\) \{[\s\S]*?scale:\s*STRATEGY_CAMERA_SCALE/s);
-  assert.match(app, /state\.mode === "strategy" \? STRATEGY_EDGE_SPEED : undefined/);
-  assert.match(app, /function zoomWithWheel\(event\) \{\s*if \(state\.mode === "strategy"\) \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?return;/s);
+  assert.match(app, /isStrategyMapMode\(\) \? STRATEGY_EDGE_SPEED : undefined/);
+  assert.match(app, /function zoomWithWheel\(event\) \{\s*if \(isStrategyMapMode\(\)\) \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?return;/s);
   assert.match(app, /function initialCameraScale\(\) \{\s*return CAMERA_LIMITS\.minScale;/s);
 });

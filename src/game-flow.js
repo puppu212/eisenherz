@@ -2,6 +2,7 @@ export const FLOW_SCREEN = Object.freeze({
   BOOT: "boot",
   TITLE: "title",
   SCENARIO: "scenario",
+  FACTION: "faction",
   LOADING: "loading",
   STRATEGY: "strategy",
   BATTLE: "battle",
@@ -12,6 +13,7 @@ export const FLOW_EVENT = Object.freeze({
   BOOT_READY: "boot-ready",
   CHOOSE_DIFFICULTY: "choose-difficulty",
   START_SCENARIO: "start-scenario",
+  CHOOSE_FACTION: "choose-faction",
   FINISH_LOADING: "finish-loading",
   START_BATTLE: "start-battle",
   FINISH_BATTLE: "finish-battle",
@@ -28,8 +30,12 @@ const TRANSITIONS = Object.freeze({
     [FLOW_EVENT.CHOOSE_DIFFICULTY]: FLOW_SCREEN.SCENARIO,
   }),
   [FLOW_SCREEN.SCENARIO]: Object.freeze({
-    [FLOW_EVENT.START_SCENARIO]: FLOW_SCREEN.LOADING,
+    [FLOW_EVENT.START_SCENARIO]: FLOW_SCREEN.FACTION,
     [FLOW_EVENT.BACK]: FLOW_SCREEN.TITLE,
+  }),
+  [FLOW_SCREEN.FACTION]: Object.freeze({
+    [FLOW_EVENT.CHOOSE_FACTION]: FLOW_SCREEN.LOADING,
+    [FLOW_EVENT.BACK]: FLOW_SCREEN.SCENARIO,
   }),
   [FLOW_SCREEN.LOADING]: Object.freeze({
     [FLOW_EVENT.FINISH_LOADING]: FLOW_SCREEN.STRATEGY,
@@ -53,6 +59,7 @@ export function createGameFlow() {
     screen: FLOW_SCREEN.BOOT,
     difficulty: "easy",
     scenarioId: null,
+    factionId: null,
   });
 }
 
@@ -61,6 +68,8 @@ export function transitionGameFlow(flow, event, payload = {}) {
   if (!nextScreen) {
     throw new Error(`Invalid game flow transition: ${flow.screen} -> ${event}`);
   }
+  const returnedToScenarios = nextScreen === FLOW_SCREEN.SCENARIO
+    && [FLOW_EVENT.BACK, FLOW_EVENT.RETURN_SCENARIOS].includes(event);
 
   return Object.freeze({
     ...flow,
@@ -70,7 +79,16 @@ export function transitionGameFlow(flow, event, payload = {}) {
       : flow.difficulty,
     scenarioId: event === FLOW_EVENT.START_SCENARIO
       ? payload.scenarioId ?? flow.scenarioId
-      : flow.scenarioId,
+      : returnedToScenarios
+        ? null
+        : flow.scenarioId,
+    factionId: event === FLOW_EVENT.CHOOSE_FACTION
+      ? payload.factionId ?? flow.factionId
+      : event === FLOW_EVENT.START_SCENARIO
+        ? null
+        : returnedToScenarios
+          ? null
+          : flow.factionId,
   });
 }
 

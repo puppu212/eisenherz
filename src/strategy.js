@@ -21,16 +21,23 @@ const INITIAL_ENEMY_FORMATIONS = Object.freeze([
   { type: "tank", count: 4 },
 ]);
 
-export function createStrategyState(data) {
+export function createStrategyState(data, playerFactionId = "deutschland") {
   const funds = data.funds ?? { player: 720, enemy: 0, neutral: 0 };
   return {
     width: data.width,
     height: data.height,
     funds: { player: 0, enemy: 0, neutral: 0, ...funds },
-    spots: data.spots.map((spot, index) => ({
-      ...spot,
-      units: createSpotUnits(spot, index),
-    })),
+    spots: data.spots.map((spot, index) => {
+      const normalizedSpot = {
+        ...spot,
+        factionId: spot.factionId ?? (spot.owner === "player" ? playerFactionId : null),
+        owner: strategyOwnerForFaction(spot, playerFactionId),
+      };
+      return {
+        ...normalizedSpot,
+        units: createSpotUnits(normalizedSpot, index),
+      };
+    }),
     links: data.links.map(link => ({ type: "route", ...link })),
     turn: 1,
     phase: "player",
@@ -42,6 +49,11 @@ export function createStrategyState(data) {
     nextUnitId: 1,
     message: "自領地を選択してください",
   };
+}
+
+function strategyOwnerForFaction(spot, playerFactionId) {
+  if (spot.factionId) return spot.factionId === playerFactionId ? "player" : "enemy";
+  return spot.owner ?? "neutral";
 }
 
 export function getStrategySpot(strategy, id) {
