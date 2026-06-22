@@ -1,0 +1,41 @@
+{
+  "width": 3406,
+  "height": 1923,
+  "factions": [
+    {
+      "id": "deutschland",
+      "name": "Deutschland",
+      "commander": "ELISE",
+      "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "flag": "flag1",
+      "portrait": "./assets/character/char1.webp"
+    }
+  ],
+  "spots": [
+    {
+      "id": "spot1",
+      "name": "SPOT 1",
+      "x": 1705,
+      "y": 1085,
+      "image": "spot1",
+      "factionId": "deutschland",
+      "owner": "player"
+    },
+    {
+      "id": "spot2",
+      "name": "SPOT 2",
+      "x": 1905,
+      "y": 1085,
+      "image": "spot2",
+      "owner": "neutral",
+      "scale": 0.5
+    }
+  ],
+  "links": [
+    {
+      "from": "spot1",
+      "to": "spot2",
+      "type": "route"
+    }
+  ]
+}

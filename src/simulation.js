@@ -37,6 +37,39 @@ export function createBattle(options = {}) {
   const allyOrigin = { x: width * 0.26, y: height * 0.64 };
   const enemyOrigin = { x: width * 0.74, y: height * 0.36 };
 
+  if (Array.isArray(options.alliedUnits) || Array.isArray(options.enemyUnits)) {
+    createRosterUnits(units, {
+      team: "ally",
+      roster: options.alliedUnits ?? [],
+      origin: allyOrigin,
+      direction: { x: 1, y: -1 },
+      rules,
+    });
+    createRosterUnits(units, {
+      team: "enemy",
+      roster: options.enemyUnits ?? [],
+      origin: enemyOrigin,
+      direction: { x: -1, y: 1 },
+      rules,
+    });
+
+    return {
+      width,
+      height,
+      rules,
+      allyControlMode: options.allyControlMode ?? "hold",
+      terrainMovement: options.terrainMovement ?? null,
+      units,
+      shells: [],
+      explosions: [],
+      elapsed: 0,
+      winner: null,
+      nextShellId: 1,
+      nextExplosionId: 1,
+      fireTarget: null,
+    };
+  }
+
   const alliedFormations = [
     ["tank-a", "frontline-tanks-a", "tank", "frontline", -330, -125],
     ["tank-b", "frontline-tanks-b", "tank", "frontline", -100, -60],
@@ -98,6 +131,50 @@ export function createBattle(options = {}) {
   };
 }
 
+function createRosterUnits(units, { team, roster, origin, direction, rules }) {
+  const formations = new Map();
+  for (const unit of roster) {
+    const formationId = unit.formationId ?? `${unit.spotId ?? team}-${unit.type ?? "tank"}`;
+    if (!formations.has(formationId)) formations.set(formationId, []);
+    formations.get(formationId).push(unit);
+  }
+
+  const sortedFormations = [...formations.entries()].sort(([first], [second]) =>
+    first.localeCompare(second)
+  );
+  const formationSpacingX = 210;
+  const formationSpacingY = 68;
+  sortedFormations.forEach(([formationId, formationUnits], formationIndex) => {
+    const centerOffset = formationIndex - (sortedFormations.length - 1) / 2;
+    const baseX = origin.x - direction.x * centerOffset * formationSpacingX;
+    const baseY = origin.y + direction.y * centerOffset * formationSpacingY;
+    const columns = Math.ceil(Math.sqrt(formationUnits.length));
+    const unitSpacing = 92;
+
+    formationUnits.forEach((sourceUnit, unitIndex) => {
+      const column = unitIndex % columns;
+      const row = Math.floor(unitIndex / columns);
+      const localX = (column - (columns - 1) / 2) * unitSpacing;
+      const localY = (row - (Math.ceil(formationUnits.length / columns) - 1) / 2) * unitSpacing;
+      const battleUnit = createUnit(
+        sourceUnit.id ?? `${team}-${formationId}-${unitIndex + 1}`,
+        team,
+        baseX + localX,
+        baseY + localY,
+        rules,
+        {
+          type: sourceUnit.type,
+          role: sourceUnit.role,
+          formationId,
+        }
+      );
+      battleUnit.angle = team === "ally" ? 0 : Math.PI;
+      battleUnit.facing = team === "ally" ? "right" : "left";
+      units.push(battleUnit);
+    });
+  });
+}
+
 export function updateBattle(battle, deltaSeconds) {
   if (deltaSeconds <= 0) return battle;
   battle.explosions ??= [];
@@ -125,7 +202,7 @@ export function updateBattle(battle, deltaSeconds) {
     const dy = target.y - unit.y;
     const distance = Math.hypot(dx, dy);
 
-    if (unit.team === "ally" && battle.allyControlMode !== "auto") {
+    if (unit.team === "ally" && !isAutoControlled(battle, unit)) {
       updateHeldUnit(battle, unit, target, dx, dy, distance, delta);
       continue;
     }
@@ -166,12 +243,16 @@ export function updateBattle(battle, deltaSeconds) {
 
 export function setAllyControlMode(battle, mode) {
   battle.allyControlMode = mode === "auto" ? "auto" : "hold";
+  for (const unit of battle.units) {
+    if (unit.team === "ally") unit.controlMode = null;
+  }
 }
 
 export function issueMoveOrder(battle, unitDestinations) {
   for (const { unitId, x, y, angle = 0 } of unitDestinations) {
     const unit = battle.units.find(candidate => candidate.id === unitId && candidate.alive);
     if (!unit || unit.team !== "ally") continue;
+    unit.controlMode = "hold";
     unit.command = { type: "move", x, y, angle };
     unit.state = "moving";
   }
@@ -236,6 +317,7 @@ function createUnit(id, team, x, y, rules, metadata = {}) {
     state: "moving",
     targetId: null,
     command: null,
+    controlMode: null,
   };
 }
 
@@ -296,7 +378,7 @@ function updateHeldUnit(battle, unit, target, dx, dy, distance, delta) {
 
 function updateFireTargetUnit(battle, unit, delta) {
   let moved = updateManualMove(battle, unit, delta);
-  if (!moved && battle.allyControlMode === "auto") {
+  if (!moved && isAutoControlled(battle, unit)) {
     moved = updateAutoPositioningUnit(battle, unit, delta);
   }
   const target = battle.fireTarget;
@@ -358,6 +440,10 @@ function updateFireTargetUnit(battle, unit, delta) {
     unit.facing = facingFromDirection(dx);
     unit.state = "holding";
   }
+}
+
+function isAutoControlled(battle, unit) {
+  return (unit.controlMode ?? battle.allyControlMode) === "auto";
 }
 
 function updateAutoPositioningUnit(battle, unit, delta) {

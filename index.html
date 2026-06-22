@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000">
   <title>EISENHERZ</title>
   <link rel="icon" href="./assets/icon/icon.ico" sizes="any">
-  <link rel="stylesheet" href="./styles.css?v=12">
+  <link rel="stylesheet" href="./styles.css?v=28">
 </head>
 <body>
   <main class="game-shell">
@@ -16,25 +16,72 @@
         <h1>DEMO</h1>
       </div>
       <div class="battle-status" aria-live="polite">
-        <span class="team-count ally"><b id="ally-count">24</b> ALLIES</span>
+        <span class="team-count ally"><b id="ally-count">1</b> <span id="ally-label">OWN</span></span>
         <span id="battle-message">ENGAGED</span>
-        <span class="team-count enemy"><b id="enemy-count">24</b> ENEMIES</span>
+        <span class="team-count enemy"><b id="enemy-count">1</b> <span id="enemy-label">NEUTRAL</span></span>
       </div>
       <div class="controls">
-        <button id="toggle-pause" type="button" aria-pressed="false">PAUSE</button>
-        <button id="restart" type="button">RESTART</button>
+        <button id="header-back" type="button" hidden>BACK</button>
+        <button id="toggle-pause" type="button" aria-pressed="false">END TURN</button>
       </div>
     </header>
 
     <section class="battlefield-wrap">
       <canvas id="battlefield" aria-label="自動戦闘マップ"></canvas>
+      <section id="title-screen" class="title-screen front-screen" aria-labelledby="title-screen-heading">
+        <div class="title-stage">
+          <h2 id="title-screen-heading" class="visually-hidden">EisenHerz</h2>
+          <nav class="title-menu" aria-label="タイトルメニュー">
+            <button id="title-new-game" class="title-difficulty" type="button" data-difficulty="easy">
+              <img src="./assets/title/easy.webp" alt="Einfacher Modus">
+            </button>
+            <button class="title-difficulty" type="button" data-difficulty="normal">
+              <img src="./assets/title/normal.webp" alt="Normaler Modus">
+            </button>
+            <button class="title-difficulty" type="button" data-difficulty="hard">
+              <img src="./assets/title/hard.webp" alt="Schwerer Modus">
+            </button>
+            <button type="button" disabled>
+              <img src="./assets/title/continue.webp" alt="Fortsetzen">
+            </button>
+            <button type="button" disabled>
+              <img src="./assets/title/tool.webp" alt="Einstellungen">
+            </button>
+          </nav>
+        </div>
+      </section>
+      <section id="scenario-screen" class="scenario-screen front-screen" aria-labelledby="scenario-screen-title" hidden>
+        <h2 id="scenario-screen-title" class="visually-hidden">シナリオ選択</h2>
+        <div class="scenario-layout">
+          <header class="scenario-heading" aria-hidden="true">
+            <p>SCENARIO ARCHIVE</p>
+            <strong>SELECT SCENARIO</strong>
+          </header>
+          <nav id="scenario-list" aria-label="シナリオ一覧"></nav>
+          <article id="scenario-detail">
+            <p class="scenario-kicker">SELECTED SCENARIO</p>
+            <h3 id="scenario-title"></h3>
+            <p id="scenario-description"></p>
+            <div class="scenario-data">
+              <div id="scenario-faction" data-label="FACTION"></div>
+              <div id="scenario-difficulty" data-label="DIFFICULTY"></div>
+              <div id="scenario-objective" data-label="OBJECTIVE"></div>
+            </div>
+            <button id="scenario-start" class="operation-launch" type="button" aria-label="シナリオを開始"></button>
+          </article>
+          <p class="scenario-help">ENTER: START <span>RIGHT CLICK / ESC: BACK</span></p>
+        </div>
+      </section>
       <div id="loading" class="loading" role="status" aria-live="polite">
         <div class="loading-card">
           <p class="loading-kicker">EISENHERZ</p>
           <strong>LOADING</strong>
-          <span id="loading-message">戦場データを構築しています</span>
+          <span id="loading-message">INITIALIZING...</span>
           <i aria-hidden="true"></i>
         </div>
+      </div>
+      <div id="scenario-loading" class="scenario-loading" aria-hidden="true" hidden>
+        <img id="scenario-loading-image" alt="">
       </div>
       <section id="start-screen" class="start-screen" aria-labelledby="start-title" hidden>
         <p class="start-kicker">VAHREN WEB EDITION</p>
@@ -108,6 +155,55 @@
           <button type="button" data-select-role="rearGuard">REAR GUARD</button>
         </div>
       </aside>
+      <aside id="strategy-panel" class="strategy-panel hud-panel" aria-label="Strategy phase controls">
+        <header class="strategy-heading">
+          <img class="strategy-master-portrait" src="./assets/character/char1.webp" alt="勢力マスター">
+          <div class="strategy-master-info">
+            <p class="panel-kicker">FACTION MASTER</p>
+            <h2>OPERATIONS</h2>
+          </div>
+        </header>
+        <dl class="strategy-status">
+          <div>
+            <dt>TURN</dt>
+            <dd id="strategy-turn">1</dd>
+          </div>
+          <div>
+            <dt>PHASE</dt>
+            <dd id="strategy-phase">PLAYER</dd>
+          </div>
+        </dl>
+        <section class="strategy-selection" aria-label="Selected operation">
+          <p><span>FROM</span><b id="strategy-source">NONE</b></p>
+          <p><span>TARGET</span><b id="strategy-target">NONE</b></p>
+        </section>
+        <div id="strategy-selected-forces" class="strategy-selected-forces" hidden></div>
+        <p id="strategy-message" class="strategy-message">自領地を選択してください</p>
+      </aside>
+      <aside id="faction-panel" class="faction-panel hud-panel" aria-live="polite" hidden>
+        <p class="panel-kicker">SELECT FACTION</p>
+        <div id="faction-empty" class="faction-empty">
+          <h2 id="faction-empty-title">勢力を選択</h2>
+          <p id="faction-empty-message">マップ上の領地を選択してください。</p>
+        </div>
+        <div id="faction-detail" hidden>
+          <header class="faction-heading">
+            <img id="faction-portrait" src="./assets/character/char1.webp" alt="">
+            <div>
+              <span>FACTION</span>
+              <h2 id="faction-name">Deutschland</h2>
+              <p id="faction-commander">COMMANDER · ELISE</p>
+            </div>
+          </header>
+          <p id="faction-description" class="faction-description"></p>
+          <dl class="faction-stats">
+            <div><dt>TERRITORIES</dt><dd id="faction-territories">0</dd></div>
+            <div><dt>STATUS</dt><dd>PLAYABLE</dd></div>
+          </dl>
+          <button id="choose-faction" class="faction-choose" type="button">この勢力で開始</button>
+        </div>
+      </aside>
+      <div id="strategy-spot-panels" class="strategy-spot-panels" aria-label="Opened spot panels"></div>
       <aside class="unit-status-panel hud-panel" aria-label="Allied unit status and selection">
         <header class="unit-status-heading">
           <h2>UNIT STATUS</h2>
@@ -127,15 +223,79 @@
         </div>
         <button id="result-restart" type="button">RESTART BATTLE</button>
       </section>
+      <section
+        id="invasion-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invasion-title"
+        hidden
+      >
+        <p class="result-kicker">INVASION ORDER</p>
+        <h2 id="invasion-title">侵攻しますか？</h2>
+        <p id="invasion-summary" class="invasion-summary"></p>
+        <div class="invasion-actions">
+          <button id="confirm-invasion" type="button">出撃</button>
+          <button id="cancel-invasion" type="button">キャンセル</button>
+        </div>
+      </section>
+      <section
+        id="faction-confirm-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="faction-confirm-title"
+        hidden
+      >
+        <p class="result-kicker">CONFIRM FACTION</p>
+        <h2 id="faction-confirm-title">この勢力で開始しますか？</h2>
+        <p id="faction-confirm-summary" class="invasion-summary"></p>
+        <div class="invasion-actions">
+          <button id="confirm-faction" type="button">開始</button>
+          <button id="cancel-faction" type="button">キャンセル</button>
+        </div>
+      </section>
+      <section
+        id="strategy-exit-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="strategy-exit-title"
+        hidden
+      >
+        <p class="result-kicker">LEAVE OPERATION</p>
+        <h2 id="strategy-exit-title">シナリオ選択へ戻りますか？</h2>
+        <p class="invasion-summary">現在の進行状況は破棄されます。</p>
+        <div class="invasion-actions">
+          <button id="confirm-strategy-exit" type="button">戻る</button>
+          <button id="cancel-strategy-exit" type="button">キャンセル</button>
+        </div>
+      </section>
+      <section
+        id="battle-briefing"
+        class="battle-briefing"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="battle-briefing-title"
+        hidden
+      >
+        <header class="battle-briefing-header">
+          <p class="result-kicker">BATTLE READY</p>
+          <h2 id="battle-briefing-title">戦闘準備完了</h2>
+        </header>
+        <p id="battle-briefing-summary" class="battle-briefing-summary"></p>
+        <button id="begin-battle" type="button">戦闘開始</button>
+      </section>
       <div class="legend">
-        <span><i class="ally-dot"></i>味方部隊</span>
-        <span><i class="enemy-dot"></i>敵戦車</span>
-        <span>空地左クリック: 射撃指定 / 左ドラッグ: 選択 / ホイール: 拡大縮小</span>
-        <span id="zoom-level">60%</span>
+        <span><i class="ally-dot"></i>自領地</span>
+        <span><i class="enemy-dot"></i>中立 / 退却線</span>
+        <span id="legend-help">拠点クリック: 選択 / 画面端: スクロール</span>
+        <span id="zoom-level">54%</span>
       </div>
+      <div id="screen-transition" class="screen-transition" aria-hidden="true" hidden></div>
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=15"></script>
+  <script type="module" src="./src/app.js?v=37"></script>
 </body>
 </html>
