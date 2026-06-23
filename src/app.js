@@ -121,6 +121,9 @@ const cancelFactionButton = document.getElementById("cancel-faction");
 const strategyExitDialog = document.getElementById("strategy-exit-dialog");
 const confirmStrategyExitButton = document.getElementById("confirm-strategy-exit");
 const cancelStrategyExitButton = document.getElementById("cancel-strategy-exit");
+const endTurnDialog = document.getElementById("end-turn-dialog");
+const confirmEndTurnButton = document.getElementById("confirm-end-turn");
+const cancelEndTurnButton = document.getElementById("cancel-end-turn");
 const invasionDialog = document.getElementById("invasion-dialog");
 const invasionTitle = document.getElementById("invasion-title");
 const invasionSummary = document.getElementById("invasion-summary");
@@ -371,6 +374,8 @@ async function boot() {
   cancelFactionButton.addEventListener("click", cancelFactionSelection);
   confirmStrategyExitButton.addEventListener("click", confirmStrategyExit);
   cancelStrategyExitButton.addEventListener("click", cancelStrategyExit);
+  confirmEndTurnButton.addEventListener("click", confirmEndTurn);
+  cancelEndTurnButton.addEventListener("click", cancelEndTurn);
   commanderPanel.addEventListener("click", handlePanelSelection);
   commanderPanel.addEventListener("pointerdown", startHudPanelDrag);
   unitStatusPanel.addEventListener("click", handlePanelSelection);
@@ -679,6 +684,7 @@ function closeStrategyTransientUi() {
   battleBriefing.hidden = true;
   factionConfirmDialog.hidden = true;
   strategyExitDialog.hidden = true;
+  endTurnDialog.hidden = true;
 }
 
 function createStrategyCamera() {
@@ -911,13 +917,29 @@ function hideControls() {
 function togglePause() {
   if (state.transitioning) return;
   if (state.mode === "strategy") {
-    endStrategyTurn();
+    openEndTurnDialog();
     return;
   }
   if (!state.started || state.battle?.winner) return;
   state.paused = !state.paused;
   syncPauseButton();
   battleMessage.textContent = state.paused ? "PAUSED" : battleLabel();
+}
+
+function openEndTurnDialog() {
+  if (state.strategy.phase !== "player") return;
+  endTurnDialog.hidden = false;
+  confirmEndTurnButton.focus();
+}
+
+function confirmEndTurn() {
+  endTurnDialog.hidden = true;
+  endStrategyTurn();
+}
+
+function cancelEndTurn() {
+  endTurnDialog.hidden = true;
+  pauseButton.focus();
 }
 
 function syncPauseButton() {
@@ -1012,6 +1034,16 @@ function handleKeyboard(event) {
     } else if (event.code === "Escape") {
       event.preventDefault();
       cancelStrategyExit();
+    }
+    return;
+  }
+  if (!endTurnDialog.hidden) {
+    if (event.code === "Enter" && !event.repeat) {
+      event.preventDefault();
+      confirmEndTurn();
+    } else if (event.code === "Escape") {
+      event.preventDefault();
+      cancelEndTurn();
     }
     return;
   }

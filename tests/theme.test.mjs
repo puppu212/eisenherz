@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=28"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=37"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=38"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -55,6 +55,10 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /id="invasion-dialog"[\s\S]*role="dialog"/);
   assert.match(html, /id="confirm-invasion"[^>]*>出撃<\/button>/);
   assert.match(html, /id="cancel-invasion"[^>]*>キャンセル<\/button>/);
+  assert.match(html, /id="end-turn-title">ターンを終了しますか？<\/h2>/);
+  assert.match(html, /id="end-turn-description"[^>]*>ターンを終了すると、残っている行動は実行できなくなります。<\/p>/);
+  assert.match(html, /id="confirm-end-turn"[^>]*>ターンを終了<\/button>/);
+  assert.match(html, /id="cancel-end-turn"[^>]*>キャンセル<\/button>/);
   assert.match(html, /id="battle-briefing"[\s\S]*role="dialog"/);
   assert.match(html, /id="battle-briefing-title">戦闘準備完了<\/h2>/);
   assert.match(html, /id="begin-battle"[^>]*>戦闘開始<\/button>/);

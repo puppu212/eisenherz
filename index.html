@@ -272,6 +272,23 @@
         </div>
       </section>
       <section
+        id="end-turn-dialog"
+        class="invasion-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="end-turn-title"
+        aria-describedby="end-turn-description"
+        hidden
+      >
+        <p class="result-kicker">END TURN</p>
+        <h2 id="end-turn-title">ターンを終了しますか？</h2>
+        <p id="end-turn-description" class="invasion-summary">ターンを終了すると、残っている行動は実行できなくなります。</p>
+        <div class="invasion-actions">
+          <button id="confirm-end-turn" type="button">ターンを終了</button>
+          <button id="cancel-end-turn" type="button">キャンセル</button>
+        </div>
+      </section>
+      <section
         id="battle-briefing"
         class="battle-briefing"
         role="dialog"
@@ -296,6 +313,6 @@
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=37"></script>
+  <script type="module" src="./src/app.js?v=38"></script>
 </body>
 </html>
