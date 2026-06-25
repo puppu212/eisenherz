@@ -27,7 +27,7 @@ const INITIAL_ENEMY_FORMATIONS = Object.freeze([
 ]);
 
 export function createStrategyState(data, playerFactionId = "deutschland") {
-  const funds = data.funds ?? { player: 720, enemy: 0, neutral: 0 };
+  const funds = data.funds ?? { player: 10000, enemy: 0, neutral: 0 };
   return {
     width: data.width,
     height: data.height,

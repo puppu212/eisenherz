@@ -33,6 +33,7 @@ test("strategy state builds the initial formations and route graph", async () =>
   assert.equal(target.units.length, 24);
   assert.equal(areStrategySpotsLinked(strategy, source.id, target.id), true);
   assert.equal(source.economy, 1000);
+  assert.equal(strategy.funds.player, 10000);
 });
 
 test("legacy player ownership is normalized to the default faction", () => {
@@ -58,7 +59,7 @@ test("player income is the total economy of owned spots", async () => {
 
   const income = collectPlayerIncome(strategy);
   assert.equal(income, 3000);
-  assert.equal(strategy.funds.player, 3720);
+  assert.equal(strategy.funds.player, 13000);
 });
 
 test("hiring spends funds and adds a unit to an owned spot", async () => {
@@ -66,7 +67,7 @@ test("hiring spends funds and adds a unit to an owned spot", async () => {
   const source = strategy.spots.find(spot => spot.id === "spot1");
   const unit = hireStrategyUnit(strategy, source.id, "artillery");
 
-  assert.equal(strategy.funds.player, 540);
+  assert.equal(strategy.funds.player, 9820);
   assert.equal(source.units.length, 25);
   assert.equal(unit.type, "artillery");
   assert.equal(unit.formationId, source.units.find(candidate => candidate.type === "artillery").formationId);

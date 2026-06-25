@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=29"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=64"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=65"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -184,11 +184,9 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /ctx\.setLineDash\(isCommitted \? \[10, 8\] : \[\]\)/);
   assert.match(app, /ctx\.globalAlpha = isCommitted \? 0\.62 : 1/);
   assert.match(app, /function startCommandDrag\(event\)/);
-  assert.match(app, /function formationDestinations\(centerX, centerY, angle\)/);
-  assert.match(app, /function squareFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
-  assert.match(app, /function denseFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
-  assert.match(app, /function lineFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
-  assert.match(app, /function centeredGridOffset\(column, row, columns, lateralSpacing, forwardSpacing\)/);
+  assert.match(app, /import \{\s*buildFormationDestinations,\s*\} from "\.\/formation\.js"/s);
+  assert.match(app, /function selectedFormationDestinations\(centerX, centerY, angle\)/);
+  assert.match(app, /return buildFormationDestinations\(\{\s*centerX,\s*centerY,\s*angle,\s*units,\s*style: state\.formationStyle,/s);
   assert.match(app, /canvas\.addEventListener\("contextmenu", event => event\.preventDefault\(\)\)/);
   assert.match(app, /window\.addEventListener\("contextmenu", handleScreenBack, \{ capture: true \}\)/);
   assert.match(app, /function handleStrategySpotPanelContextMenu\(event\) \{[\s\S]*?selectStrategyAttackTarget\(spot\);[\s\S]*?closeStrategySpotPanel\(panel\.dataset\.spotId\);/);

@@ -19,12 +19,6 @@ import {
 } from "./camera.js";
 import {
   buildFormationDestinations,
-  centeredGridOffset as calculateCenteredGridOffset,
-  denseFormationDestinations as buildDenseFormationDestinations,
-  groupSelectedFormations as groupFormationsByRole,
-  lineFormationDestinations as buildLineFormationDestinations,
-  pushFormationUnitDestinations as pushCalculatedFormationUnitDestinations,
-  squareFormationDestinations as buildSquareFormationDestinations,
 } from "./formation.js";
 import {
   FLOW_EVENT,
@@ -1577,7 +1571,7 @@ function drawCommandPreview() {
   const drag = state.commandDrag;
   if (!drag || state.selectedUnitIds.size === 0) return;
   const angle = commandAngle(drag);
-  const destinations = formationDestinations(drag.startX, drag.startY, angle);
+  const destinations = selectedFormationDestinations(drag.startX, drag.startY, angle);
   if (destinations.length === 0) return;
 
   ctx.save();
@@ -3468,7 +3462,7 @@ function finishCommandDrag(event) {
   const drag = state.commandDrag;
   if (!drag || drag.pointerId !== event.pointerId) return;
   const angle = commandAngle(drag);
-  const destinations = formationDestinations(drag.startX, drag.startY, angle);
+  const destinations = selectedFormationDestinations(drag.startX, drag.startY, angle);
   if (destinations.length > 0) {
     issueMoveOrder(state.battle, destinations);
     syncControlModeButton();
@@ -3498,7 +3492,7 @@ function selectedUnitsCenter() {
   };
 }
 
-function formationDestinations(centerX, centerY, angle) {
+function selectedFormationDestinations(centerX, centerY, angle) {
   const units = selectedLivingAllies();
   return buildFormationDestinations({
     centerX,
@@ -3507,48 +3501,6 @@ function formationDestinations(centerX, centerY, angle) {
     units,
     style: state.formationStyle,
   });
-}
-
-function lineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
-  return buildLineFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
-}
-
-function squareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
-  return buildSquareFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
-}
-
-function denseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups) {
-  return buildDenseFormationDestinations(centerX, centerY, angle, forward, lateral, roleGroups);
-}
-
-function pushFormationUnitDestinations(
-  destinations,
-  formation,
-  centerX,
-  centerY,
-  angle,
-  forward,
-  lateral,
-  formationOffset
-) {
-  pushCalculatedFormationUnitDestinations(
-    destinations,
-    formation,
-    centerX,
-    centerY,
-    angle,
-    forward,
-    lateral,
-    formationOffset
-  );
-}
-
-function centeredGridOffset(column, row, columns, lateralSpacing, forwardSpacing) {
-  return calculateCenteredGridOffset(column, row, columns, lateralSpacing, forwardSpacing);
-}
-
-function groupSelectedFormations(units) {
-  return groupFormationsByRole(units);
 }
 
 function selectedLivingAllies() {
