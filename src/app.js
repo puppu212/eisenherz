@@ -271,6 +271,9 @@ const STRATEGY_CAMERA_SCALE = 1.8;
 const STRATEGY_EDGE_SPEED = 780;
 const SCREEN_TRANSITION_FADE_MS = 220;
 const SCREEN_TRANSITION_HOLD_MS = 520;
+const DIAGONAL_CUT_COVER_MS = 900;
+const DIAGONAL_CUT_HOLD_MS = 260;
+const DIAGONAL_CUT_REVEAL_MS = 360;
 const SCENARIO_LOADING_HOLD_MS = 1200;
 const BATTLE_HUD_INTERVAL_MS = 100;
 const STRATEGY_WARNING_MS = 1400;
@@ -595,10 +598,12 @@ function openScenarioScreen(difficulty = "easy") {
 
 function startSelectedScenario() {
   if (state.flow.screen !== FLOW_SCREEN.SCENARIO || state.transitioning) return;
-  runScreenTransition(() => {
-    state.selectedFactionId = null;
-    updateGameFlow(FLOW_EVENT.START_SCENARIO, { scenarioId: state.selectedScenarioId });
-    enterFactionSelectionMode();
+  runIllustratedScreenTransition({
+    revealAction: () => {
+      state.selectedFactionId = null;
+      updateGameFlow(FLOW_EVENT.START_SCENARIO, { scenarioId: state.selectedScenarioId });
+      enterFactionSelectionMode();
+    },
   });
 }
 
@@ -730,10 +735,23 @@ function selectScenarioLoadingArt() {
 
 async function runScenarioLoadingTransition() {
   if (state.transitioning || state.flow.screen !== FLOW_SCREEN.FACTION) return;
+  runIllustratedScreenTransition({
+    revealAction: () => updateGameFlow(FLOW_EVENT.CHOOSE_FACTION, { factionId: state.selectedFactionId }),
+    completeAction: () => {
+      resetStrategyState();
+      enterStrategyMode();
+      updateGameFlow(FLOW_EVENT.FINISH_LOADING);
+    },
+  });
+}
+
+async function runIllustratedScreenTransition({ revealAction, completeAction = () => {} }) {
+  if (state.transitioning) return;
   state.transitioning = true;
   const art = selectScenarioLoadingArt();
   scenarioLoadingImage.src = art.url;
   scenarioLoading.style.setProperty("--loading-art-position", art.position);
+  const variantClass = "is-diagonal-cut";
 
   try {
     await scenarioLoadingImage.decode().catch(() => {});
@@ -742,25 +760,29 @@ async function runScenarioLoadingTransition() {
     screenTransition.classList.add("is-visible");
     await delay(SCREEN_TRANSITION_FADE_MS);
 
-    updateGameFlow(FLOW_EVENT.CHOOSE_FACTION, { factionId: state.selectedFactionId });
+    await revealAction();
+    scenarioLoading.hidden = false;
     await nextAnimationFrame();
     screenTransition.classList.remove("is-visible");
     await delay(SCREEN_TRANSITION_FADE_MS);
     await delay(SCENARIO_LOADING_HOLD_MS);
 
+    screenTransition.classList.add(variantClass);
+    screenTransition.hidden = false;
+    await nextAnimationFrame();
     screenTransition.classList.add("is-visible");
-    await delay(SCREEN_TRANSITION_FADE_MS);
-    resetStrategyState();
-    enterStrategyMode();
-    updateGameFlow(FLOW_EVENT.FINISH_LOADING);
+    await delay(DIAGONAL_CUT_REVEAL_MS);
+    scenarioLoading.hidden = true;
+    await completeAction();
     state.lastTime = performance.now();
 
     await nextAnimationFrame();
     screenTransition.classList.remove("is-visible");
-    await delay(SCREEN_TRANSITION_FADE_MS);
+    await delay(DIAGONAL_CUT_REVEAL_MS);
   } finally {
     scenarioLoading.hidden = true;
     screenTransition.classList.remove("is-visible");
+    screenTransition.classList.remove(variantClass);
     screenTransition.hidden = true;
     state.transitioning = false;
   }
@@ -920,7 +942,8 @@ function enterBattleMode(options = {}) {
 
 function transitionToBattleMode(options = {}) {
   const showBriefing = options.showBriefing ?? state.mode === "strategy";
-  if (state.mode === "strategy") hideStrategyHudForBattleTransition();
+  const isStrategyBattleTransition = state.mode === "strategy";
+  if (isStrategyBattleTransition) hideStrategyHudForBattleTransition();
   runScreenTransition(() => {
     updateGameFlow(FLOW_EVENT.START_BATTLE);
     enterBattleMode({
@@ -928,7 +951,9 @@ function transitionToBattleMode(options = {}) {
       waitForStart: showBriefing ? true : options.waitForStart,
       showBriefing,
     });
-  });
+  }, isStrategyBattleTransition ? {
+    ...diagonalCutTransitionOptions(),
+  } : {});
 }
 
 function hideStrategyHudForBattleTransition() {
@@ -1021,9 +1046,20 @@ function beginBriefedBattle() {
   canvas.focus?.();
 }
 
+function diagonalCutTransitionOptions() {
+  return {
+    variant: "diagonal-cut",
+    fadeMs: DIAGONAL_CUT_COVER_MS,
+    holdMs: DIAGONAL_CUT_HOLD_MS,
+    revealMs: DIAGONAL_CUT_REVEAL_MS,
+  };
+}
+
 async function runScreenTransition(action, options = {}) {
   if (state.transitioning) return;
   state.transitioning = true;
+  const variantClass = options.variant ? `is-${options.variant}` : "";
+  if (variantClass) screenTransition.classList.add(variantClass);
   screenTransition.hidden = false;
 
   await nextAnimationFrame();
@@ -1037,7 +1073,8 @@ async function runScreenTransition(action, options = {}) {
   } finally {
     await nextAnimationFrame();
     screenTransition.classList.remove("is-visible");
-    await delay(options.fadeMs ?? SCREEN_TRANSITION_FADE_MS);
+    await delay(options.revealMs ?? options.fadeMs ?? SCREEN_TRANSITION_FADE_MS);
+    if (variantClass) screenTransition.classList.remove(variantClass);
     screenTransition.hidden = true;
     state.transitioning = false;
   }

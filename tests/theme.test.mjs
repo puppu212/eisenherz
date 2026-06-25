@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=31"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=72"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=83"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -231,7 +231,11 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function selectScenario\(scenarioId\)/);
   assert.match(
     app,
-    /async function runScenarioLoadingTransition\(\)[\s\S]*?screenTransition\.classList\.add\("is-visible"\);[\s\S]*?await delay\(SCREEN_TRANSITION_FADE_MS\);[\s\S]*?updateGameFlow\(FLOW_EVENT\.CHOOSE_FACTION/s
+    /function startSelectedScenario\(\)[\s\S]*?runIllustratedScreenTransition\(\{[\s\S]*?updateGameFlow\(FLOW_EVENT\.START_SCENARIO/s
+  );
+  assert.match(
+    app,
+    /async function runScenarioLoadingTransition\(\)[\s\S]*?runIllustratedScreenTransition\(\{[\s\S]*?updateGameFlow\(FLOW_EVENT\.CHOOSE_FACTION[\s\S]*?updateGameFlow\(FLOW_EVENT\.FINISH_LOADING/s
   );
   assert.match(app, /function startSelectedScenario\(\)/);
   assert.match(app, /function drawStrategyMap\(\)/);
@@ -247,6 +251,14 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /const STRATEGY_CAMERA_SCALE = 1\.8;/);
   assert.match(app, /const STRATEGY_EDGE_SPEED = 780;/);
   assert.match(app, /const SCREEN_TRANSITION_HOLD_MS = 520;/);
+  assert.match(app, /const DIAGONAL_CUT_COVER_MS = 900;/);
+  assert.doesNotMatch(app, /ILLUSTRATED_CUT_COVER_MS/);
+  assert.doesNotMatch(app, /ILLUSTRATED_FADE_MS/);
+  assert.doesNotMatch(app, /ILLUSTRATED_CUT_HOLD_MS/);
+  assert.match(app, /screenTransition\.classList\.add\("is-visible"\);\s*await delay\(SCREEN_TRANSITION_FADE_MS\);[\s\S]*?await revealAction\(\);/s);
+  assert.match(app, /await delay\(SCENARIO_LOADING_HOLD_MS\);[\s\S]*?screenTransition\.classList\.add\(variantClass\);/s);
+  assert.match(app, /await delay\(DIAGONAL_CUT_REVEAL_MS\);\s*scenarioLoading\.hidden = true;\s*await completeAction\(\);/s);
+  assert.match(css, /\.screen-transition\.is-diagonal-cut\s*\{/);
   assert.match(app, /function runScreenTransition\(action, options = \{\}\)/);
   assert.match(app, /function createStrategyCamera\(\) \{[\s\S]*?scale:\s*STRATEGY_CAMERA_SCALE/s);
   assert.match(app, /isStrategyMapMode\(\) \? STRATEGY_EDGE_SPEED : undefined/);

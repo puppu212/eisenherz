@@ -659,6 +659,75 @@ button:disabled:hover {
 
 .screen-transition[hidden] { display: none; }
 
+.screen-transition-panel {
+  position: absolute;
+  top: -18vh;
+  bottom: -18vh;
+  left: -24vw;
+  width: 148vw;
+  display: none;
+  transform: translateX(-132vw) skewX(-16deg);
+  transform-origin: center;
+  will-change: transform;
+}
+
+.screen-transition-panel-paper {
+  background: var(--white);
+}
+
+.screen-transition-panel-red {
+  background: var(--red);
+}
+
+.screen-transition-panel-black {
+  background: var(--black);
+}
+
+.screen-transition.is-diagonal-cut {
+  background: transparent;
+  opacity: 1;
+  transition: none;
+}
+
+.screen-transition.is-diagonal-cut .screen-transition-panel {
+  display: block;
+}
+
+.screen-transition.is-diagonal-cut.is-visible .screen-transition-panel-paper {
+  animation: diagonalCutFlash 900ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.screen-transition.is-diagonal-cut.is-visible .screen-transition-panel-red {
+  animation: diagonalCutFlash 900ms cubic-bezier(.22, 1, .36, 1) 80ms both;
+}
+
+.screen-transition.is-diagonal-cut.is-visible .screen-transition-panel-black {
+  animation: diagonalCutHold 1260ms cubic-bezier(.22, 1, .36, 1) 170ms both;
+}
+
+.screen-transition.is-diagonal-cut:not(.is-visible) .screen-transition-panel-black {
+  display: block;
+  transform: translateX(0) skewX(-16deg);
+  animation: diagonalCutReveal 360ms cubic-bezier(.64, 0, .78, 0) both;
+}
+
+@keyframes diagonalCutFlash {
+  0% { transform: translateX(-132vw) skewX(-16deg); }
+  54% { transform: translateX(0) skewX(-16deg); }
+  100% { transform: translateX(132vw) skewX(-16deg); }
+}
+
+@keyframes diagonalCutHold {
+  0% { transform: translateX(-132vw) skewX(-16deg); }
+  36% { transform: translateX(0) skewX(-16deg); }
+  100% { transform: translateX(0) skewX(-16deg); }
+}
+
+@keyframes diagonalCutReveal {
+  from { transform: translateX(0) skewX(-16deg); }
+  to { transform: translateX(132vw) skewX(-16deg); }
+}
+
 .start-kicker,
 .start-edition {
   margin: 0;
