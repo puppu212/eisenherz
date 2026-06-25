@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=31"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=86"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=87"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -206,6 +206,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /runScreenTransition\(returnToScenarioScreen\)/);
   assert.match(app, /function returnToScenarioScreen\(\) \{\s*resetScenarioSessionState\(\);\s*updateGameFlow\(FLOW_EVENT\.RETURN_SCENARIOS\);\s*\}/s);
   assert.match(app, /function resetScenarioSessionState\(\) \{[\s\S]*?state\.selectedFactionId = null;[\s\S]*?state\.strategyCleared = false;[\s\S]*?resetStrategyState\(\);[\s\S]*?resetBattle\(\{ waitForStart: true \}\);/s);
+  assert.match(app, /function resetScenarioSessionState\(\) \{[\s\S]*?strategyPanel\.hidden = true;[\s\S]*?strategySpotPanels\.hidden = true;[\s\S]*?factionPanel\.hidden = true;/s);
   assert.match(app, /function resetStrategyState\(\) \{[\s\S]*?state\.strategy = createStrategyState\(state\.strategyData, state\.selectedFactionId \?\? "deutschland"\)/s);
   assert.match(app, /function enterStrategyMode\(\) \{\s*closeStrategyTransientUi\(\);/s);
   assert.match(app, /function transitionToStrategyMode\(\) \{[\s\S]*?clearStrategySelection\(\);[\s\S]*?enterStrategyMode\(\);/s);

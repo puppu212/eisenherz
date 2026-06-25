@@ -580,8 +580,8 @@ function resetScenarioSessionState() {
   startScreen.hidden = true;
   commanderPanel.hidden = true;
   unitStatusPanel.hidden = true;
-  strategyPanel.hidden = false;
-  strategySpotPanels.hidden = false;
+  strategyPanel.hidden = true;
+  strategySpotPanels.hidden = true;
   factionPanel.hidden = true;
 }
 
