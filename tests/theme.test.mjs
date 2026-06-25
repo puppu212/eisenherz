@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=31"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=83"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=84"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -257,7 +257,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.doesNotMatch(app, /ILLUSTRATED_CUT_HOLD_MS/);
   assert.match(app, /screenTransition\.classList\.add\("is-visible"\);\s*await delay\(SCREEN_TRANSITION_FADE_MS\);[\s\S]*?await revealAction\(\);/s);
   assert.match(app, /await delay\(SCENARIO_LOADING_HOLD_MS\);[\s\S]*?screenTransition\.classList\.add\(variantClass\);/s);
-  assert.match(app, /await delay\(DIAGONAL_CUT_REVEAL_MS\);\s*scenarioLoading\.hidden = true;\s*await completeAction\(\);/s);
+  assert.match(app, /await delay\(DIAGONAL_CUT_COVER_MS\);\s*scenarioLoading\.hidden = true;\s*await completeAction\(\);/s);
   assert.match(css, /\.screen-transition\.is-diagonal-cut\s*\{/);
   assert.match(app, /function runScreenTransition\(action, options = \{\}\)/);
   assert.match(app, /function createStrategyCamera\(\) \{[\s\S]*?scale:\s*STRATEGY_CAMERA_SCALE/s);

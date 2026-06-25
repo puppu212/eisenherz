@@ -771,7 +771,7 @@ async function runIllustratedScreenTransition({ revealAction, completeAction = (
     screenTransition.hidden = false;
     await nextAnimationFrame();
     screenTransition.classList.add("is-visible");
-    await delay(DIAGONAL_CUT_REVEAL_MS);
+    await delay(DIAGONAL_CUT_COVER_MS);
     scenarioLoading.hidden = true;
     await completeAction();
     state.lastTime = performance.now();
