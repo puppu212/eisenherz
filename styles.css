@@ -1652,6 +1652,16 @@ button:disabled:hover {
 .strategy-sortie-panel.is-drop-hover {
   background: var(--white);
   color: var(--black);
+  animation: sortie-drop-pulse 520ms ease-in-out infinite alternate;
+}
+
+@keyframes sortie-drop-pulse {
+  from {
+    background: var(--white);
+  }
+  to {
+    background: #d8d8d8;
+  }
 }
 
 .strategy-spot-panel.is-drop-hover .panel-kicker,

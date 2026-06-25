@@ -3707,7 +3707,10 @@ function selectedLivingAllies() {
 function startStrategyForceDrag(event, captureElement = strategySelectedForces, clickToggle = null) {
   if (event.button !== 0 || state.mode !== "strategy" || state.strategy.phase !== "player") return;
   const units = selectedStrategyUnits();
-  if (units.length === 0 && !clickToggle) return;
+  const dragUnits = clickToggle
+    ? strategyUnitsByIds(clickToggle.spotId, clickToggle.unitIds ?? [])
+    : units;
+  if (dragUnits.length === 0) return;
   state.strategyForceDrag = {
     pointerId: event.pointerId,
     captureElement,
@@ -3722,7 +3725,7 @@ function startStrategyForceDrag(event, captureElement = strategySelectedForces, 
   };
   captureElement.setPointerCapture?.(event.pointerId);
   strategySelectedForces.classList.add("is-dragging");
-  for (const unit of units) {
+  for (const unit of dragUnits) {
     const card = document.querySelector(`[data-strategy-unit="${CSS.escape(unit.id)}"]`);
     card?.classList.add("is-dragging");
   }
@@ -3739,10 +3742,12 @@ function updateStrategyForceDrag(event) {
     event.clientX - drag.startClientX,
     event.clientY - drag.startClientY
   ) >= 4;
-  if (drag.moved) prepareStrategyForceDragSelection(drag);
   if (drag.moved && !drag.ghost) {
-    drag.ghost = createStrategyDragGhost(selectedStrategyUnits());
-    document.body.append(drag.ghost);
+    const ghostUnits = strategyForceDragUnits(drag);
+    if (ghostUnits.length > 0) {
+      drag.ghost = createStrategyDragGhost(ghostUnits);
+      document.body.append(drag.ghost);
+    }
   }
   const sortiePanel = strategySortieDropPanelAt(event);
   if (drag.ghost) {
@@ -3756,13 +3761,18 @@ function updateStrategyForceDrag(event) {
   event.preventDefault();
 }
 
-function prepareStrategyForceDragSelection(drag) {
-  if (drag.selectionPrepared || !drag.clickToggle) return;
-  const unitIds = drag.clickToggle.unitIds ?? [];
-  if (unitIds.length === 0) return;
-  const additive = drag.clickToggle.type !== "all";
-  selectStrategyUnitIds(drag.clickToggle.spotId, unitIds, additive);
-  drag.selectionPrepared = true;
+function strategyForceDragUnits(drag) {
+  if (drag.clickToggle) {
+    return strategyUnitsByIds(drag.clickToggle.spotId, drag.clickToggle.unitIds ?? []);
+  }
+  return selectedStrategyUnits();
+}
+
+function strategyUnitsByIds(spotId, ids) {
+  const spot = strategySpot(spotId);
+  if (!spot) return [];
+  const idSet = new Set(ids);
+  return spot.units.filter(unit => idSet.has(unit.id) && canSelectStrategyUnit(unit));
 }
 
 function createStrategyDragGhost(units) {
@@ -3803,6 +3813,11 @@ function finishStrategyForceDrag(event) {
   cancelStrategyForceDrag(event);
   suppressNextStrategyPanelClick();
   if (sortiePanel) {
+    if (clickToggle) {
+      const unitIds = clickToggle.unitIds ?? [];
+      const additive = clickToggle.type !== "all";
+      commitStrategyForceDragSelection(clickToggle.spotId, unitIds, additive);
+    }
     state.strategy.message = strategySelectionMessage();
     updateStrategyHud();
     updateStrategySpotPanels();
@@ -3817,6 +3832,20 @@ function finishStrategyForceDrag(event) {
     updateStrategySpotPanels();
   }
   event.preventDefault();
+}
+
+function commitStrategyForceDragSelection(spotId, ids, additive = true) {
+  const spot = strategySpot(spotId);
+  if (!spot || !canSelectStrategySpotUnits(spot)) return;
+  if (!state.strategy.selectedTargetId && state.strategy.selectedSourceId !== spot.id) {
+    state.strategy.selectedUnitIds.clear();
+  }
+  state.strategy.selectedSourceId = spot.id;
+  if (!additive) state.strategy.selectedUnitIds.clear();
+
+  const eligible = new Set(spot.units.filter(unit => canSelectStrategyUnit(unit)).map(unit => unit.id));
+  addStrategyUnitIdsWithinLimit(ids.filter(id => eligible.has(id)));
+  state.strategy.selectedSpotId = spot.id;
 }
 
 function suppressNextStrategyPanelClick() {
@@ -3857,11 +3886,19 @@ function invasionDropPanelAt(event) {
 
 function strategySortieDropPanelAt(event) {
   if (state.mode !== "strategy") return null;
-  if (!state.strategy.selectedTargetId || selectedStrategyUnits().length === 0) return null;
+  if (!state.strategy.selectedTargetId || strategyForceDragUnitCount(event) === 0) return null;
   const panel = document
     .elementsFromPoint(event.clientX, event.clientY)
     .find(element => element.classList?.contains("strategy-sortie-panel"));
   return panel ?? null;
+}
+
+function strategyForceDragUnitCount(event) {
+  const drag = state.strategyForceDrag;
+  if (drag?.pointerId === event.pointerId && drag.clickToggle) {
+    return drag.clickToggle.unitIds?.length ?? 0;
+  }
+  return selectedStrategyUnits().length;
 }
 
 function beginInvasion(targetId = state.strategy.selectedTargetId) {
