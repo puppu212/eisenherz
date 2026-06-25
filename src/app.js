@@ -2889,7 +2889,7 @@ function canSelectStrategySpotUnits(spot) {
   if (!spot || spot.owner !== "player") return false;
   const target = strategySpot(state.strategy.selectedTargetId);
   if (!target) return true;
-  return spot.id === state.strategy.selectedSourceId && canInvadeTarget(spot, target);
+  return canInvadeTarget(spot, target);
 }
 
 function addStrategyUnitIdsWithinLimit(ids) {
@@ -3940,7 +3940,6 @@ function selectStrategySpot(spot) {
     if (isStrategyAttackSourceCandidate(spot)) {
       state.strategy.selectedSpotId = spot.id;
       state.strategy.selectedSourceId = spot.id;
-      state.strategy.selectedUnitIds.clear();
       openStrategySpotPanel(spot);
       state.strategy.message = strategySelectionMessage();
       updateStrategyHud();

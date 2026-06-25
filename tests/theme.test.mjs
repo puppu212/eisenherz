@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=29"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=68"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=69"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -193,6 +193,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function closeStrategySpotPanel\(spotId\) \{[\s\S]*?const closesTargetPanel = state\.strategy\.selectedTargetId === spotId;[\s\S]*?if \(closesTargetPanel\) \{/);
   assert.match(app, /function syncStrategySortiePanel\(\) \{[\s\S]*?renderStrategySortiePanel\(panel, target\);\s*\}/);
   assert.match(app, /function selectStrategyAttackTarget\(spot\) \{[\s\S]*?syncStrategySortiePanel\(\);[\s\S]*?placeStrategySortiePanel\(state\.strategySortiePanel, targetPanel\);/);
+  assert.match(app, /if \(isStrategyAttackSourceCandidate\(spot\)\) \{\s*state\.strategy\.selectedSpotId = spot\.id;\s*state\.strategy\.selectedSourceId = spot\.id;\s*openStrategySpotPanel\(spot\);/);
+  assert.match(app, /function canSelectStrategySpotUnits\(spot\) \{[\s\S]*?if \(!target\) return true;\s*return canInvadeTarget\(spot, target\);/);
   assert.match(app, /function startStrategySelection\(event\) \{[\s\S]*?if \(event\.button === 2\) event\.preventDefault\(\);[\s\S]*?const spot = strategySpotAt/s);
   assert.match(app, /function handleScreenBack\(event\) \{\s*event\.preventDefault\(\);\s*if \(!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION\]\.includes\(state\.flow\.screen\)\) return;/);
   assert.match(app, /!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION\]\.includes\(state\.flow\.screen\)/);
