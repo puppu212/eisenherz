@@ -58,7 +58,7 @@ test("battle sprites use the WebP asset set", async () => {
   const strategy = JSON.parse(
     await readFile(new URL("../assets/spot/strategy.json", import.meta.url), "utf8")
   );
-  assert.equal(strategy.factions.find(faction => faction.id === "poland")?.commander, "ANASTAZJA");
+  assert.equal(strategy.factions.find(faction => faction.id === "poland")?.commander, "Anastazja");
   assert.equal(strategy.factions.find(faction => faction.id === "poland")?.selectable, false);
   assert.equal(strategy.spots.find(spot => spot.name === "Berlin")?.image, "Berlin");
   assert.equal(strategy.spots.find(spot => spot.name === "Koenigsberg")?.image, "port");

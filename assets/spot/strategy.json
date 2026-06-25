@@ -5,7 +5,7 @@
     {
       "id": "deutschland",
       "name": "Deutschland",
-      "commander": "ELISE",
+      "commander": "Elise",
       "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
       "flag": "flag1",
       "portrait": "./assets/character/char1.webp",
@@ -14,8 +14,8 @@
     {
       "id": "poland",
       "name": "Poland",
-      "commander": "ANASTAZJA",
-      "description": "A rival command holding the Polish corridor and eastern approaches.",
+      "commander": "Anastazja",
+      "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
       "flag": "flag6",
       "portrait": "./assets/character/char6.webp",
       "selectable": false

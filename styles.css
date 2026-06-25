@@ -809,11 +809,10 @@ button:disabled:hover {
 .commander-name {
   overflow: hidden;
   font-family: var(--font-display);
-  font-size: 34px;
-  line-height: 1;
+  font-size: 30px;
+  line-height: .95;
   letter-spacing: .03em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .force-status {
@@ -1068,7 +1067,14 @@ button:disabled:hover {
 }
 .faction-heading span { color: var(--red); font-size: 9px; font-weight: 900; letter-spacing: .18em; }
 .faction-heading h2 { overflow: hidden; margin: 3px 0; font-size: 30px; text-overflow: ellipsis; }
-.faction-heading p { margin: 0; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.faction-heading p {
+  margin: 0;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  overflow-wrap: anywhere;
+}
 
 .faction-description { min-height: 64px; margin: 0; padding: 14px 16px; border-bottom: 3px solid var(--white); font-size: 13px; line-height: 1.7; }
 .faction-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0; padding: 7px; }
@@ -1103,6 +1109,91 @@ button:disabled:hover {
 }
 
 .strategy-spot-panel[hidden] { display: none; }
+
+.strategy-faction-info-panel {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, auto);
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(430px, calc(100% - 28px));
+  overflow: hidden;
+  border: 3px solid var(--white);
+  background: var(--black);
+  color: var(--white);
+  user-select: none;
+  pointer-events: auto;
+}
+
+.strategy-faction-info-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 30px;
+}
+
+.strategy-faction-info-heading h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-faction-media {
+  display: grid;
+  grid-template-columns: 106px 72px minmax(0, 1fr);
+  min-height: 106px;
+  border-bottom: 3px solid var(--white);
+}
+
+.strategy-faction-media img {
+  display: block;
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.strategy-faction-portrait {
+  border-right: 3px solid var(--white);
+}
+
+.strategy-faction-media .strategy-faction-flag {
+  padding: 8px;
+  border-right: 3px solid var(--white);
+  background: var(--black);
+  object-fit: contain;
+}
+
+.strategy-faction-media > div {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.strategy-faction-media strong {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: .95;
+  overflow-wrap: anywhere;
+}
+
+.strategy-faction-summary {
+  grid-template-columns: 1fr 1fr;
+}
+
+.strategy-faction-description {
+  min-height: 64px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  color: rgba(255, 255, 255, .86);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
 
 .strategy-spot-panel.is-own-spot .unit-status-heading {
   border-bottom-color: var(--white);

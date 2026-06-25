@@ -187,7 +187,7 @@ const CONTROL_GUIDES = Object.freeze({
 const DEFAULT_FACTION = Object.freeze({
   id: "deutschland",
   name: "Deutschland",
-  commander: "ELISE",
+  commander: "Elise",
   description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
   portrait: "./assets/character/char1.webp",
 });
@@ -307,6 +307,7 @@ const state = {
   externalPanelSelectionDrag: null,
   strategyPanelSelectionDrag: null,
   strategySortiePanel: null,
+  strategyFactionPanels: new Map(),
   commandDrag: null,
   strategyForceDrag: null,
   hudPanelDrag: null,
@@ -341,7 +342,7 @@ async function boot() {
     fetchJson("./assets/map/map1.json"),
     loadImages(ASSET_URLS),
     loadExplosionFrames(),
-    fetchJson("./assets/spot/strategy.json?v=2"),
+    fetchJson("./assets/spot/strategy.json?v=3"),
     loadImages(STRATEGY_ASSET_URLS),
   ]);
 
@@ -661,7 +662,7 @@ function selectFactionById(factionId, spotId = null) {
   factionPortrait.src = faction.portrait;
   factionPortrait.alt = `${faction.name} commander`;
   factionName.textContent = faction.name;
-  factionCommander.textContent = `COMMANDER · ${faction.commander.toUpperCase()}`;
+  factionCommander.textContent = `COMMANDER · ${faction.commander}`;
   factionDescription.textContent = selectable
     ? faction.description
     : "この勢力は選択できません。";
@@ -806,6 +807,7 @@ function closeStrategyTransientUi() {
   cancelStrategyForceDrag();
   for (const panel of state.strategy.openSpotPanels.values()) panel.remove();
   state.strategy.openSpotPanels.clear();
+  closeStrategyFactionInfoPanels();
   closeStrategySortiePanel();
   invasionDialog.hidden = true;
   strategyWarningDialog.hidden = true;
@@ -2195,6 +2197,16 @@ function updateStrategySpotPanels() {
     }
     renderStrategySpotPanel(panel, spot);
   }
+  for (const [factionId, panel] of state.strategyFactionPanels) {
+    const faction = factionById(factionId);
+    const spot = state.strategy.spots.find(candidate => candidate.factionId === factionId);
+    if (!faction || !spot) {
+      panel.remove();
+      state.strategyFactionPanels.delete(factionId);
+      continue;
+    }
+    renderStrategyFactionInfoPanel(panel, faction, spot);
+  }
   syncStrategySortiePanel();
 }
 
@@ -2210,6 +2222,134 @@ function openStrategySpotPanel(spot) {
   if (isNewPanel) placeNewStrategySpotPanel(panel, spot);
   bringHudPanelToFront(panel);
   return panel;
+}
+
+function openStrategyFactionInfoPanel(spot) {
+  const faction = factionById(spot.factionId);
+  if (!faction) return null;
+  let panel = state.strategyFactionPanels.get(faction.id);
+  const isNewPanel = !panel;
+  if (!panel) {
+    panel = createStrategyFactionInfoPanelElement(faction);
+    state.strategyFactionPanels.set(faction.id, panel);
+    strategySpotPanels.append(panel);
+  }
+  renderStrategyFactionInfoPanel(panel, faction, spot);
+  if (isNewPanel) placeNewStrategyFactionPanel(panel, spot);
+  bringHudPanelToFront(panel);
+  return panel;
+}
+
+function createStrategyFactionInfoPanelElement(faction) {
+  const panel = document.createElement("aside");
+  panel.className = "strategy-faction-info-panel hud-panel";
+  panel.dataset.factionId = faction.id;
+  panel.setAttribute("aria-label", `${faction.name} faction information`);
+  return panel;
+}
+
+function placeNewStrategyFactionPanel(panel, spot) {
+  const canvasRect = canvas.getBoundingClientRect();
+  const flagScreen = worldToScreen(...strategyFlagCenter(spot));
+  const panelRect = panel.getBoundingClientRect();
+  const gap = 14;
+  const left = canvasRect.left + flagScreen.x + gap;
+  const top = canvasRect.top + flagScreen.y - panelRect.height / 2;
+  placeHudPanel(panel, left, top);
+}
+
+function renderStrategyFactionInfoPanel(panel, faction, spot) {
+  const factionSpots = state.strategy.spots.filter(candidate => candidate.factionId === faction.id);
+  const units = factionSpots.flatMap(candidate => candidate.units).filter(unit => unit.alive);
+  const economy = factionSpots.reduce((sum, candidate) => sum + (candidate.economy ?? 0), 0);
+  panel.replaceChildren(
+    buildStrategyFactionInfoHeader(faction),
+    buildStrategyFactionInfoMedia(faction),
+    buildStrategyFactionInfoSummary(faction, factionSpots, units, economy),
+    buildStrategyFactionInfoDescription(faction, spot)
+  );
+}
+
+function buildStrategyFactionInfoHeader(faction) {
+  const header = document.createElement("header");
+  header.className = "unit-status-heading strategy-faction-info-heading";
+
+  const title = document.createElement("h2");
+  title.textContent = faction.name;
+
+  const mode = document.createElement("p");
+  mode.textContent = "FACTION";
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "strategy-panel-close";
+  close.dataset.closeFactionPanel = faction.id;
+  close.setAttribute("aria-label", `${faction.name}を閉じる`);
+  close.textContent = "X";
+
+  header.append(title, mode, close);
+  return header;
+}
+
+function buildStrategyFactionInfoMedia(faction) {
+  const media = document.createElement("div");
+  media.className = "strategy-faction-media";
+
+  const portrait = document.createElement("img");
+  portrait.className = "strategy-faction-portrait";
+  portrait.src = faction.portrait ?? DEFAULT_FACTION.portrait;
+  portrait.alt = `${faction.commander ?? faction.name} commander`;
+
+  const flag = document.createElement("img");
+  flag.className = "strategy-faction-flag";
+  flag.src = STRATEGY_ASSET_URLS[faction.flag] ?? STRATEGY_ASSET_URLS.flag1;
+  flag.alt = `${faction.name} flag`;
+
+  const text = document.createElement("div");
+  const kicker = document.createElement("p");
+  kicker.className = "panel-kicker";
+  kicker.textContent = "COMMANDER";
+  const commander = document.createElement("strong");
+  commander.textContent = formatCommanderName(faction.commander ?? "Unknown");
+  text.append(kicker, commander);
+
+  media.append(portrait, flag, text);
+  return media;
+}
+
+function formatCommanderName(name) {
+  return name.toLocaleLowerCase().replace(/^\p{L}/u, letter => letter.toLocaleUpperCase());
+}
+
+function buildStrategyFactionInfoSummary(faction, factionSpots, units, economy) {
+  const summary = document.createElement("dl");
+  summary.className = "strategy-spot-summary strategy-faction-summary";
+  const owner = faction.id === state.strategy.playerFactionId ? "player" : "enemy";
+  summary.innerHTML = `
+    <div><dt>STATUS</dt><dd>${OWNER_LABELS[owner] ?? owner.toUpperCase()}</dd></div>
+    <div><dt>AREAS</dt><dd>${factionSpots.length}</dd></div>
+    <div><dt>UNITS</dt><dd>${units.length}</dd></div>
+    <div><dt>ECONOMY</dt><dd>${economy}</dd></div>
+  `;
+  return summary;
+}
+
+function buildStrategyFactionInfoDescription(faction, spot) {
+  const description = document.createElement("p");
+  description.className = "strategy-faction-description";
+  description.textContent = `${faction.description ?? ""} / ${spot.name}`;
+  return description;
+}
+
+function closeStrategyFactionInfoPanel(factionId) {
+  const panel = state.strategyFactionPanels.get(factionId);
+  panel?.remove();
+  state.strategyFactionPanels.delete(factionId);
+}
+
+function closeStrategyFactionInfoPanels() {
+  for (const panel of state.strategyFactionPanels.values()) panel.remove();
+  state.strategyFactionPanels.clear();
 }
 
 function createStrategySpotPanelElement(spot) {
@@ -2655,6 +2795,15 @@ function hireStrategyUnit(event) {
 
 function handleStrategySpotPanelClick(event) {
   if (state.suppressPanelClick) return;
+  const factionPanel = event.target.closest(".strategy-faction-info-panel");
+  if (factionPanel) bringHudPanelToFront(factionPanel);
+
+  const closeFactionButton = event.target.closest("[data-close-faction-panel]");
+  if (closeFactionButton) {
+    closeStrategyFactionInfoPanel(closeFactionButton.dataset.closeFactionPanel);
+    return;
+  }
+
   const panel = event.target.closest(".strategy-spot-panel");
   if (panel) bringHudPanelToFront(panel);
 
@@ -2742,6 +2891,13 @@ function handleStrategySortiePanelClick(event) {
 }
 
 function handleStrategySpotPanelContextMenu(event) {
+  const factionPanel = event.target.closest(".strategy-faction-info-panel");
+  if (factionPanel) {
+    event.preventDefault();
+    closeStrategyFactionInfoPanel(factionPanel.dataset.factionId);
+    return;
+  }
+
   const panel = event.target.closest(".strategy-spot-panel");
   if (!panel) return;
   event.preventDefault();
@@ -3200,15 +3356,16 @@ function startHudPanelDrag(event) {
   const panel = event.currentTarget;
   const strategySpotPanel = event.target.closest?.(".strategy-spot-panel");
   const strategySortiePanel = event.target.closest?.(".strategy-sortie-panel");
+  const strategyFactionPanel = event.target.closest?.(".strategy-faction-info-panel");
   let captureElement = panel;
-  if (strategySpotPanel || strategySortiePanel) {
+  if (strategySpotPanel || strategySortiePanel || strategyFactionPanel) {
     const isSelectionSurface = event.target.closest?.(
       ".strategy-units-panel, .strategy-hire-actions"
     );
     if (isSelectionSurface) return;
     captureElement = event.currentTarget;
   }
-  const dragPanel = strategySpotPanel ?? strategySortiePanel ?? panel;
+  const dragPanel = strategySpotPanel ?? strategySortiePanel ?? strategyFactionPanel ?? panel;
   state.hudPanelDrag = {
     pointerId: event.pointerId,
     panel: dragPanel,
@@ -3896,6 +4053,12 @@ function startStrategySelection(event) {
   if (event.button === 2) event.preventDefault();
   const point = canvasPoint(event);
   const world = screenToWorld(point.x, point.y);
+  const flaggedSpot = event.button === 0 ? strategyFlagAt(world.x, world.y) : null;
+  if (flaggedSpot && state.mode === "strategy") {
+    openStrategyFactionInfoPanel(flaggedSpot);
+    event.preventDefault();
+    return;
+  }
   const spot = strategySpotAt(world.x, world.y);
   if (!spot) {
     if (state.mode === "strategy") clearStrategySelection();
@@ -3933,6 +4096,32 @@ function strategySpotAt(x, y) {
     }
   }
   return selected;
+}
+
+function strategyFlagAt(x, y) {
+  let selected = null;
+  let bestDistance = Infinity;
+  for (const spot of state.strategy.spots) {
+    if (!factionById(spot.factionId)?.flag) continue;
+    const [flagX, flagY] = strategyFlagCenter(spot);
+    const size = STRATEGY_FLAG_SIZE * 1.35;
+    const inBounds = Math.abs(x - flagX) <= size / 2 && Math.abs(y - flagY) <= size / 2;
+    if (!inBounds) continue;
+    const distance = Math.hypot(flagX - x, flagY - y);
+    if (distance <= bestDistance) {
+      selected = spot;
+      bestDistance = distance;
+    }
+  }
+  return selected;
+}
+
+function strategyFlagCenter(spot) {
+  const size = SPOT_SIZE * strategySpotScale(spot);
+  return [
+    spot.x + size / 2,
+    spot.y - size / 2,
+  ];
 }
 
 function selectStrategySpot(spot) {
@@ -3987,6 +4176,7 @@ function selectStrategyAttackTarget(spot) {
     return;
   }
 
+  closeStrategyFactionInfoPanels();
   const source = strategySpot(state.strategy.selectedSourceId);
   const nextSourceId = canInvadeTarget(source, spot) ? source.id : null;
   const targetPanel = openStrategySpotPanel(spot);

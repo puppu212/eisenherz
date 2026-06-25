@@ -22,8 +22,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
-  assert.match(html, /href="\.\/styles\.css\?v=29"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=69"/);
+  assert.match(html, /href="\.\/styles\.css\?v=31"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=72"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -77,7 +77,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /data-select-role="frontline">FRONTLINE<\/button>/);
   assert.match(html, /data-select-role="rearGuard">REAR GUARD<\/button>/);
   assert.match(html, /id="selection-box"[^>]*hidden/);
-  assert.match(html, /class="commander-name">ELISE<\/strong>/);
+  assert.match(html, /class="commander-name">Elise<\/strong>/);
   assert.match(html, /src="\.\/assets\/character\/char1\.webp"/);
   assert.match(html, /id="panel-unit-count"/);
   assert.match(html, /id="panel-unit-count">24<\/span>\s*\/ 24/);
