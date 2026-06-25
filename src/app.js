@@ -2244,7 +2244,6 @@ function syncStrategySortiePanel() {
   }
   const panel = ensureStrategySortiePanel(target);
   renderStrategySortiePanel(panel, target);
-  placeStrategySortiePanel(panel, targetPanel);
 }
 
 function ensureStrategySortiePanel(target) {
@@ -2759,13 +2758,13 @@ function closeStrategySpotPanel(spotId) {
   const panel = state.strategy.openSpotPanels.get(spotId);
   if (panel) panel.remove();
   state.strategy.openSpotPanels.delete(spotId);
-  const wasSelectingTarget = Boolean(state.strategy.selectedTargetId);
+  const closesTargetPanel = state.strategy.selectedTargetId === spotId;
   if (state.strategy.selectedSpotId === spotId) state.strategy.selectedSpotId = null;
   if (state.strategy.selectedSourceId === spotId) {
     state.strategy.selectedSourceId = null;
   }
   removeSelectedStrategyUnitsFromSpot(spotId);
-  if (wasSelectingTarget) {
+  if (closesTargetPanel) {
     state.strategy.selectedTargetId = null;
     state.strategy.selectedUnitIds.clear();
     state.pendingOperation = null;
