@@ -1,0 +1,40 @@
+
+spot spot1
+{
+	name = Berlin
+	x = 1705
+	y = 1085
+	image = spot
+}
+
+spot spot3
+{
+	name = Warsaw
+	x = 1905
+	y = 1085
+	image = spot
+}
+
+spot spot2
+{
+	name = Konigsberg
+	x = 1906
+	y = 985
+	image = spot
+}
+
+spot spot4
+{
+	name = Poznan
+	x = 1800
+	y = 1085
+	image = spot
+}
+
+spot spot5
+{
+	name = Gdansk
+	x = 1800
+	y = 1035
+	image = spot
+}

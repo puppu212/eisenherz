@@ -1,0 +1,16 @@
+scenario sc
+{
+	spot = spot1, spot3, spot2, spot4, spot5;
+
+	showSpot(spot1)
+	showSpot(spot3)
+	showSpot(spot2)
+	showSpot(spot4)
+	showSpot(spot5)
+
+	linkSpot(spot1, spot4)
+	linkSpot(spot2, spot5)
+	linkSpot(spot3, spot4)
+	linkSpot(spot3, spot5)
+
+}

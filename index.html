@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000">
   <title>EISENHERZ</title>
   <link rel="icon" href="./assets/icon/icon.ico" sizes="any">
-  <link rel="stylesheet" href="./styles.css?v=28">
+  <link rel="stylesheet" href="./styles.css?v=29">
 </head>
 <body>
   <main class="game-shell">
@@ -22,6 +22,7 @@
       </div>
       <div class="controls">
         <button id="header-back" type="button" hidden>BACK</button>
+        <button id="header-help" type="button" aria-label="操作方法を開く" hidden>HELP</button>
         <button id="toggle-pause" type="button" aria-pressed="false">END TURN</button>
       </div>
     </header>
@@ -91,29 +92,29 @@
           <button id="start-battle" type="button">START BATTLE</button>
           <button id="show-controls" type="button">CONTROLS</button>
         </div>
-        <section
-          id="controls-dialog"
-          class="controls-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="controls-title"
-          hidden
-        >
-          <p class="controls-kicker">HOW TO PLAY</p>
-          <h3 id="controls-title">CONTROLS</h3>
-          <dl>
-            <div><dt>SELECT</dt><dd>味方ユニットまたはユニット一覧を左クリック / Escで解除</dd></div>
-            <div><dt>BOX SELECT</dt><dd>マップまたはユニット一覧を左ドラッグ</dd></div>
-            <div><dt>FIRE TARGET</dt><dd>空地を左クリックで全軍射撃指定 / ダブルクリックで解除</dd></div>
-            <div><dt>MOVE</dt><dd>右クリックで移動 / 右ドラッグで向き指定</dd></div>
-            <div><dt>FACING</dt><dd>Ctrl + 左ドラッグでも向き指定</dd></div>
-            <div><dt>CAMERA</dt><dd>カーソルを画面端へ移動</dd></div>
-            <div><dt>ZOOM</dt><dd>ホイール / ピンチ</dd></div>
-            <div><dt>PAUSE</dt><dd>SPACEキー</dd></div>
-            <div><dt>RESTART</dt><dd>ヘッダーのRESTART</dd></div>
-          </dl>
-          <button id="close-controls" type="button">CLOSE</button>
-        </section>
+      </section>
+      <section
+        id="controls-dialog"
+        class="controls-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="controls-title"
+        hidden
+      >
+        <p class="controls-kicker">HOW TO PLAY</p>
+        <h3 id="controls-title">CONTROLS</h3>
+        <dl id="controls-list">
+          <div><dt>SELECT</dt><dd>味方ユニットまたはユニット一覧を左クリック / Escで解除</dd></div>
+          <div><dt>BOX SELECT</dt><dd>マップまたはユニット一覧を左ドラッグ</dd></div>
+          <div><dt>FIRE TARGET</dt><dd>空地を左クリックで全軍射撃指定 / ダブルクリックで解除</dd></div>
+          <div><dt>MOVE</dt><dd>右クリックで移動 / 右ドラッグで向き指定</dd></div>
+          <div><dt>FACING</dt><dd>Ctrl + 左ドラッグでも向き指定</dd></div>
+          <div><dt>CAMERA</dt><dd>カーソルを画面端へ移動</dd></div>
+          <div><dt>ZOOM</dt><dd>ホイール / ピンチ</dd></div>
+          <div><dt>PAUSE</dt><dd>SPACEキー</dd></div>
+          <div><dt>RESTART</dt><dd>ヘッダーのRESTART</dd></div>
+        </dl>
+        <button id="close-controls" type="button">CLOSE</button>
       </section>
       <aside class="commander-panel hud-panel" aria-label="Commander and allied unit controls">
         <div class="commander-summary">
@@ -172,19 +173,28 @@
             <dt>PHASE</dt>
             <dd id="strategy-phase">PLAYER</dd>
           </div>
+          <div>
+            <dt>INCOME</dt>
+            <dd id="strategy-income">0</dd>
+          </div>
+          <div>
+            <dt>FUNDS</dt>
+            <dd id="strategy-funds">0</dd>
+          </div>
         </dl>
         <section class="strategy-selection" aria-label="Selected operation">
           <p><span>FROM</span><b id="strategy-source">NONE</b></p>
           <p><span>TARGET</span><b id="strategy-target">NONE</b></p>
         </section>
         <div id="strategy-selected-forces" class="strategy-selected-forces" hidden></div>
-        <p id="strategy-message" class="strategy-message">自領地を選択してください</p>
+        <p id="strategy-message" class="strategy-message">侵攻先にする敵領地を右クリックしてください</p>
       </aside>
       <aside id="faction-panel" class="faction-panel hud-panel" aria-live="polite" hidden>
         <p class="panel-kicker">SELECT FACTION</p>
+        <nav id="faction-list" class="faction-list" aria-label="勢力一覧"></nav>
         <div id="faction-empty" class="faction-empty">
           <h2 id="faction-empty-title">勢力を選択</h2>
-          <p id="faction-empty-message">マップ上の領地を選択してください。</p>
+          <p id="faction-empty-message">右の一覧、またはマップ上の旗がある領地から勢力を選んでください。</p>
         </div>
         <div id="faction-detail" hidden>
           <header class="faction-heading">
@@ -198,12 +208,12 @@
           <p id="faction-description" class="faction-description"></p>
           <dl class="faction-stats">
             <div><dt>TERRITORIES</dt><dd id="faction-territories">0</dd></div>
-            <div><dt>STATUS</dt><dd>PLAYABLE</dd></div>
+            <div><dt>STATUS</dt><dd id="faction-status">PLAYABLE</dd></div>
           </dl>
           <button id="choose-faction" class="faction-choose" type="button">この勢力で開始</button>
         </div>
       </aside>
-      <div id="strategy-spot-panels" class="strategy-spot-panels" aria-label="Opened spot panels"></div>
+      <div id="strategy-spot-panels" class="strategy-spot-panels"></div>
       <aside class="unit-status-panel hud-panel" aria-label="Allied unit status and selection">
         <header class="unit-status-heading">
           <h2>UNIT STATUS</h2>
@@ -238,6 +248,16 @@
           <button id="confirm-invasion" type="button">出撃</button>
           <button id="cancel-invasion" type="button">キャンセル</button>
         </div>
+      </section>
+      <section
+        id="strategy-warning-dialog"
+        class="strategy-warning-dialog"
+        role="alertdialog"
+        aria-live="assertive"
+        hidden
+      >
+        <p class="result-kicker">ORDER NOTICE</p>
+        <p id="strategy-warning-message" class="invasion-summary">この領地からは出撃できません。</p>
       </section>
       <section
         id="faction-confirm-dialog"
@@ -313,6 +333,6 @@
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=38"></script>
+  <script type="module" src="./src/app.js?v=64"></script>
 </body>
 </html>

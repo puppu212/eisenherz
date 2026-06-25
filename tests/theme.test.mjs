@@ -22,8 +22,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
-  assert.match(html, /href="\.\/styles\.css\?v=28"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=38"/);
+  assert.match(html, /href="\.\/styles\.css\?v=29"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=64"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -46,6 +46,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /id="ally-count">1<\/b>\s*<span id="ally-label">OWN<\/span>/);
   assert.match(html, /id="enemy-count">1<\/b>\s*<span id="enemy-label">NEUTRAL<\/span>/);
   assert.match(html, /id="toggle-pause"[^>]*>END TURN<\/button>/);
+  assert.match(html, /id="header-help"[^>]*aria-label="操作方法を開く"[^>]*>HELP<\/button>/);
   assert.doesNotMatch(html, /id="restart"/);
   assert.match(html, /class="commander-panel hud-panel"/);
   assert.match(html, /id="strategy-panel" class="strategy-panel hud-panel"/);
@@ -91,6 +92,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /id="start-battle"[^>]*>START BATTLE<\/button>/);
   assert.match(html, /id="show-controls"[^>]*>CONTROLS<\/button>/);
   assert.match(html, /id="controls-dialog"[\s\S]*role="dialog"/);
+  assert.match(html, /id="start-screen"[\s\S]*id="show-controls"[\s\S]*<\/section>\s*<section\s+id="controls-dialog"/);
+  assert.match(html, /id="controls-list"/);
   assert.match(html, /id="close-controls"[^>]*>CLOSE<\/button>/);
   assert.doesNotMatch(html, /CLICK \/ ENTER \/ SPACE TO START/);
   assert.doesNotMatch(html, /class="start-controls"/);
@@ -115,6 +118,9 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.screen-transition\.is-visible\s*\{[^}]*opacity:\s*1/s);
   assert.match(css, /#start-battle\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(css, /\.controls-dialog\s*\{[^}]*border:\s*4px solid var\(--white\)/s);
+  assert.match(app, /const CONTROL_GUIDES = Object\.freeze\(\{[\s\S]*?STRATEGY ORDERS[\s\S]*?BATTLE ORDERS/s);
+  assert.match(app, /headerHelpButton\.addEventListener\("click", showHeaderControls\)/);
+  assert.match(app, /renderControlsGuide\(state\.mode === "strategy" \? "strategy" : "battle"\)/);
   assert.match(css, /\.commander-panel\s*\{[^}]*width:\s*min\(360px, calc\(100vw - 28px\)\);[^}]*border:\s*3px solid var\(--white\)/s);
   assert.match(css, /\.strategy-panel\s*\{[^}]*width:\s*min\(360px, calc\(100vw - 28px\)\);[^}]*border:\s*3px solid var\(--white\)/s);
   assert.match(css, /\.strategy-selected-forces\s*\{[^}]*border-bottom:\s*3px solid var\(--white\)/s);
@@ -123,6 +129,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.strategy-drag-ghost\.is-valid\s*\{[^}]*border-color:\s*var\(--white\)/s);
   assert.match(css, /#begin-battle\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(css, /#confirm-invasion\s*\{[^}]*background:\s*var\(--red\)/s);
+  assert.match(app, /const INVASION_DIALOG_FRONT_Z_INDEX = 70/);
+  assert.match(app, /function showInvasionDialog\(\) \{[\s\S]*?bringHudPanelToFront\(invasionDialog\);[\s\S]*?invasionDialog\.hidden = false;/s);
   assert.match(css, /\.commander-summary\s*\{[^}]*grid-template-columns:\s*96px minmax\(0, 1fr\);[^}]*min-height:\s*96px/s);
   assert.match(css, /\.commander-portrait\s*\{[^}]*width:\s*96px;[^}]*height:\s*96px;[^}]*aspect-ratio:\s*1 \/ 1/s);
   assert.match(css, /\.force-status div\s*\{[^}]*display:\s*grid;[^}]*border:\s*2px solid var\(--white\)/s);
@@ -141,6 +149,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.battle-status\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 148px minmax\(0, 1fr\)/s);
   assert.match(css, /\.battle-status\s*\{[^}]*width:\s*372px;[^}]*min-width:\s*372px;[^}]*max-width:\s*372px/s);
   assert.match(css, /\.battle-status\[hidden\]\s*\{\s*display:\s*none;/);
+  assert.match(css, /\.controls button\s*\{[^}]*min-width:\s*72px/s);
   assert.match(css, /#battle-message\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*148px/s);
   assert.match(app, /battleStatus\.hidden = screen === FLOW_SCREEN\.FACTION;/);
   assert.match(app, /\["Enter", "Space"\]\.includes\(event\.code\)/);
@@ -181,8 +190,10 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function lineFormationDestinations\(centerX, centerY, angle, forward, lateral, roleGroups\)/);
   assert.match(app, /function centeredGridOffset\(column, row, columns, lateralSpacing, forwardSpacing\)/);
   assert.match(app, /canvas\.addEventListener\("contextmenu", event => event\.preventDefault\(\)\)/);
-  assert.match(app, /window\.addEventListener\("contextmenu", handleScreenBack\)/);
-  assert.match(app, /function handleScreenBack\(event\)/);
+  assert.match(app, /window\.addEventListener\("contextmenu", handleScreenBack, \{ capture: true \}\)/);
+  assert.match(app, /function handleStrategySpotPanelContextMenu\(event\) \{[\s\S]*?selectStrategyAttackTarget\(spot\);[\s\S]*?closeStrategySpotPanel\(panel\.dataset\.spotId\);/);
+  assert.match(app, /function startStrategySelection\(event\) \{[\s\S]*?if \(event\.button === 2\) event\.preventDefault\(\);[\s\S]*?const spot = strategySpotAt/s);
+  assert.match(app, /function handleScreenBack\(event\) \{\s*event\.preventDefault\(\);\s*if \(!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION\]\.includes\(state\.flow\.screen\)\) return;/);
   assert.match(app, /!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION\]\.includes\(state\.flow\.screen\)/);
   assert.doesNotMatch(app, /!\[FLOW_SCREEN\.SCENARIO, FLOW_SCREEN\.FACTION, FLOW_SCREEN\.STRATEGY\]\.includes\(state\.flow\.screen\)/);
   assert.match(app, /handleScreenBack\(event\)[\s\S]*?handleHeaderBack\(\);/);
@@ -223,8 +234,10 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function drawStrategyMap\(\)/);
   assert.match(app, /function trackStrategyHover\(event\)/);
   assert.match(app, /function syncStrategyHover\(\)/);
-  assert.match(app, /const hoverScale = state\.strategyHoverScales\.get\(spot\.id\) \?\? 1/);
-  assert.match(app, /function updateStrategyHoverAnimation\(delta\)/);
+  assert.match(app, /STRATEGY_FACTION_MARKER_COLORS/);
+  assert.match(app, /function hoveredStrategyFactionId\(\)/);
+  assert.match(app, /function strategyFactionMarkerColor\(factionId\)/);
+  assert.doesNotMatch(app, /strategyHoverScales/);
   assert.match(app, /function invadeSelectedSpot\(\)/);
   assert.match(app, /function endStrategyTurn\(\) \{[\s\S]*?state\.strategy\.spots\.every\(spot => spot\.owner === "player"\)[\s\S]*?showStrategyClearResult\(\);[\s\S]*?return;/s);
   assert.match(app, /function showStrategyClearResult\(\) \{[\s\S]*?resultTitle\.textContent = "SCENARIO CLEAR"[\s\S]*?battleResult\.hidden = false;/s);

@@ -11,9 +11,13 @@ test("battle sprites use the WebP asset set", async () => {
     access(new URL("../assets/effect/grenades.webp", import.meta.url)),
     access(new URL("../assets/character/char1.webp", import.meta.url)),
     access(new URL("../assets/world/world.webp", import.meta.url)),
-    access(new URL("../assets/spot/spot1.webp", import.meta.url)),
-    access(new URL("../assets/spot/spot2.webp", import.meta.url)),
-    access(new URL("../assets/flag/flag1.png", import.meta.url)),
+    access(new URL("../assets/spot/Berlin.webp", import.meta.url)),
+    access(new URL("../assets/spot/spot.webp", import.meta.url)),
+    access(new URL("../assets/spot/city.webp", import.meta.url)),
+    access(new URL("../assets/spot/port.webp", import.meta.url)),
+    access(new URL("../assets/flag/flag1.webp", import.meta.url)),
+    access(new URL("../assets/flag/flag6.webp", import.meta.url)),
+    access(new URL("../assets/character/char6.webp", import.meta.url)),
     access(new URL("../assets/spot/strategy.json", import.meta.url)),
     access(new URL("../assets/title/title.webp", import.meta.url)),
     access(new URL("../assets/title/easy.webp", import.meta.url)),
@@ -36,10 +40,15 @@ test("battle sprites use the WebP asset set", async () => {
   assert.match(source, /tank_gun\.webp/);
   assert.match(source, /grenades\.webp/);
   assert.match(source, /world\.webp/);
-  assert.match(source, /spot1\.webp/);
-  assert.match(source, /spot2\.webp/);
+  assert.match(source, /Berlin\.webp/);
+  assert.match(source, /spot\.webp/);
+  assert.match(source, /city\.webp/);
+  assert.match(source, /port\.webp/);
   assert.match(source, /function strategySpotScale\(spot\)/);
-  assert.match(source, /flag1\.png/);
+  assert.match(source, /DEFAULT_SPOT_SCALE_BY_IMAGE/);
+  assert.doesNotMatch(source, /ctx\.fillText\(spot\.name/);
+  assert.match(source, /flag1\.webp/);
+  assert.match(source, /flag6\.webp/);
   assert.match(source, /const SHELL_SIZE = 56;/);
   assert.match(source, /const ARTILLERY_SHELL_SIZE = 64;/);
   assert.match(source, /const EXPLOSION_SIZE = 176;/);
@@ -49,5 +58,18 @@ test("battle sprites use the WebP asset set", async () => {
   const strategy = JSON.parse(
     await readFile(new URL("../assets/spot/strategy.json", import.meta.url), "utf8")
   );
-  assert.equal(strategy.spots.find(spot => spot.id === "spot2")?.scale, 0.5);
+  assert.equal(strategy.factions.find(faction => faction.id === "poland")?.commander, "ANASTAZJA");
+  assert.equal(strategy.factions.find(faction => faction.id === "poland")?.selectable, false);
+  assert.equal(strategy.spots.find(spot => spot.name === "Berlin")?.image, "Berlin");
+  assert.equal(strategy.spots.find(spot => spot.name === "Koenigsberg")?.image, "port");
+  assert.equal(strategy.spots.find(spot => spot.name === "Warsaw")?.image, "city");
+  assert.deepEqual(
+    strategy.spots
+      .filter(spot => !["Berlin", "Koenigsberg", "Warsaw"].includes(spot.name))
+      .map(spot => spot.image),
+    ["spot", "spot"]
+  );
+  assert.equal(strategy.spots.some(spot => "labelOffsetX" in spot), false);
+  assert.equal(strategy.spots.some(spot => "flagOffsetX" in spot), false);
+  assert.equal(strategy.spots.some(spot => "scale" in spot), false);
 });
