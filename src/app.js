@@ -541,7 +541,7 @@ function handleHeaderBack() {
   } else if (state.flow.screen === FLOW_SCREEN.FACTION) {
     runScreenTransition(returnFromFactionSelection);
   } else if (state.flow.screen === FLOW_SCREEN.STRATEGY) {
-    strategyExitDialog.hidden = false;
+    showFrontDialog(strategyExitDialog);
     confirmStrategyExitButton.focus();
   }
 }
@@ -701,7 +701,7 @@ function openFactionConfirmation() {
   const faction = factionById(state.selectedFactionId);
   if (!faction || !isFactionSelectable(faction) || state.transitioning) return;
   factionConfirmSummary.textContent = `${faction.name}でシナリオを開始します。`;
-  factionConfirmDialog.hidden = false;
+  showFrontDialog(factionConfirmDialog);
   confirmFactionButton.focus();
 }
 
@@ -1095,7 +1095,7 @@ function showHeaderControls() {
 function showControls(returnButton = showControlsButton) {
   controlsReturnButton = returnButton;
   renderControlsGuide(state.mode === "strategy" ? "strategy" : "battle");
-  controlsDialog.hidden = false;
+  showFrontDialog(controlsDialog);
   closeControlsButton.focus();
 }
 
@@ -1136,7 +1136,7 @@ function togglePause() {
 
 function openEndTurnDialog() {
   if (state.strategy.phase !== "player") return;
-  endTurnDialog.hidden = false;
+  showFrontDialog(endTurnDialog);
   confirmEndTurnButton.focus();
 }
 
@@ -2414,11 +2414,6 @@ function syncStrategySortiePanel() {
     closeStrategySortiePanel();
     return;
   }
-  const targetPanel = state.strategy.openSpotPanels.get(target.id);
-  if (!targetPanel) {
-    closeStrategySortiePanel();
-    return;
-  }
   const panel = ensureStrategySortiePanel(target);
   renderStrategySortiePanel(panel, target);
 }
@@ -2953,10 +2948,15 @@ function closeStrategySpotPanel(spotId) {
   state.strategy.openSpotPanels.delete(spotId);
   const closesTargetPanel = state.strategy.selectedTargetId === spotId;
   if (state.strategy.selectedSpotId === spotId) state.strategy.selectedSpotId = null;
-  if (state.strategy.selectedSourceId === spotId) {
+  if (
+    state.strategy.selectedSourceId === spotId &&
+    (!state.strategy.selectedTargetId || !hasSelectedStrategyUnitsFromSpot(spotId))
+  ) {
     state.strategy.selectedSourceId = null;
   }
-  removeSelectedStrategyUnitsFromSpot(spotId);
+  if (!state.strategy.selectedTargetId) {
+    removeSelectedStrategyUnitsFromSpot(spotId);
+  }
   if (closesTargetPanel) {
     state.strategy.selectedTargetId = null;
     state.strategy.selectedUnitIds.clear();
@@ -2969,6 +2969,11 @@ function closeStrategySpotPanel(spotId) {
     : STRATEGY_MESSAGE_SELECT_TARGET;
   updateStrategyHud();
   updateStrategySpotPanels();
+}
+
+function hasSelectedStrategyUnitsFromSpot(spotId) {
+  const spot = strategySpot(spotId);
+  return Boolean(spot?.units.some(unit => state.strategy.selectedUnitIds.has(unit.id)));
 }
 
 function handleStrategyUnitSelection(button, additive = true) {
@@ -3086,14 +3091,17 @@ function canSelectStrategySpotUnits(spot) {
 }
 
 function addStrategyUnitIdsWithinLimit(ids) {
+  let rejected = false;
   for (const id of ids) {
     if (state.strategy.selectedUnitIds.has(id)) continue;
     if (state.strategy.selectedUnitIds.size >= MAX_INVASION_UNITS) {
       state.strategy.message = `一度の戦闘に参加できる部隊は${MAX_INVASION_UNITS}部隊までです`;
+      rejected = true;
       break;
     }
     state.strategy.selectedUnitIds.add(id);
   }
+  if (rejected) showStrategyCapacityWarning();
 }
 
 function removeSelectedStrategyUnitsFromSpot(spotId) {
@@ -3478,9 +3486,13 @@ function bringHudPanelToFront(panel) {
 }
 
 function showInvasionDialog() {
+  showFrontDialog(invasionDialog);
+}
+
+function showFrontDialog(dialog) {
   state.nextHudPanelZIndex = Math.max(state.nextHudPanelZIndex, INVASION_DIALOG_FRONT_Z_INDEX);
-  bringHudPanelToFront(invasionDialog);
-  invasionDialog.hidden = false;
+  bringHudPanelToFront(dialog);
+  dialog.hidden = false;
 }
 
 function startExternalPanelSelection(event) {
@@ -3807,15 +3819,24 @@ function finishStrategyForceDrag(event) {
     event.preventDefault();
     return;
   }
-  const sortiePanel = strategySortieDropPanelAt(event);
+  const sortiePanel = strategySortiePanelAt(event);
+  const dropExceedsLimit = Boolean(sortiePanel && wouldCurrentStrategyForceDropExceedLimit(event));
   const previousSelectedUnitIds = drag.previousSelectedUnitIds;
   const clickToggle = drag.clickToggle;
   cancelStrategyForceDrag(event);
   suppressNextStrategyPanelClick();
+  if (dropExceedsLimit) {
+    state.strategy.selectedUnitIds = new Set(previousSelectedUnitIds);
+    showStrategyCapacityWarning();
+    updateStrategyHud();
+    updateStrategySpotPanels();
+    event.preventDefault();
+    return;
+  }
   if (sortiePanel) {
     if (clickToggle) {
       const unitIds = clickToggle.unitIds ?? [];
-      const additive = clickToggle.type !== "all";
+      const additive = state.strategy.selectedTargetId ? true : clickToggle.type !== "all";
       commitStrategyForceDragSelection(clickToggle.spotId, unitIds, additive);
     }
     state.strategy.message = strategySelectionMessage();
@@ -3846,6 +3867,16 @@ function commitStrategyForceDragSelection(spotId, ids, additive = true) {
   const eligible = new Set(spot.units.filter(unit => canSelectStrategyUnit(unit)).map(unit => unit.id));
   addStrategyUnitIdsWithinLimit(ids.filter(id => eligible.has(id)));
   state.strategy.selectedSpotId = spot.id;
+}
+
+function wouldStrategyForceDropExceedLimit(spotId, ids, additive = true) {
+  if (!additive) return ids.length > MAX_INVASION_UNITS;
+  const spot = strategySpot(spotId);
+  if (!spot) return false;
+  const eligible = new Set(spot.units.filter(unit => canSelectStrategyUnit(unit)).map(unit => unit.id));
+  const selectedIds = new Set(selectedStrategyUnits().map(unit => unit.id));
+  const addedCount = ids.filter(id => eligible.has(id) && !selectedIds.has(id)).length;
+  return selectedIds.size + addedCount > MAX_INVASION_UNITS;
 }
 
 function suppressNextStrategyPanelClick() {
@@ -3887,6 +3918,11 @@ function invasionDropPanelAt(event) {
 function strategySortieDropPanelAt(event) {
   if (state.mode !== "strategy") return null;
   if (!state.strategy.selectedTargetId || strategyForceDragUnitCount(event) === 0) return null;
+  if (wouldCurrentStrategyForceDropExceedLimit(event)) return null;
+  return strategySortiePanelAt(event);
+}
+
+function strategySortiePanelAt(event) {
   const panel = document
     .elementsFromPoint(event.clientX, event.clientY)
     .find(element => element.classList?.contains("strategy-sortie-panel"));
@@ -3899,6 +3935,17 @@ function strategyForceDragUnitCount(event) {
     return drag.clickToggle.unitIds?.length ?? 0;
   }
   return selectedStrategyUnits().length;
+}
+
+function wouldCurrentStrategyForceDropExceedLimit(event) {
+  const drag = state.strategyForceDrag;
+  if (!drag || drag.pointerId !== event.pointerId || !drag.clickToggle) return false;
+  const additive = state.strategy.selectedTargetId ? true : drag.clickToggle.type !== "all";
+  return wouldStrategyForceDropExceedLimit(
+    drag.clickToggle.spotId,
+    drag.clickToggle.unitIds ?? [],
+    additive
+  );
 }
 
 function beginInvasion(targetId = state.strategy.selectedTargetId) {
@@ -4298,13 +4345,20 @@ function refreshStrategyTargetSelectionDialog() {
 function showInvalidStrategySourceWarning(spot, message = "侵攻先に隣接する自領地を選択してください。") {
   state.strategy.message = message;
   strategyWarningMessage.textContent = message;
-  strategyWarningDialog.hidden = false;
+  showFrontDialog(strategyWarningDialog);
   clearStrategyWarningTimeout();
   state.strategyWarningTimeout = setTimeout(() => {
     strategyWarningDialog.hidden = true;
     state.strategyWarningTimeout = null;
   }, STRATEGY_WARNING_MS);
   updateStrategyHud();
+}
+
+function showStrategyCapacityWarning() {
+  showInvalidStrategySourceWarning(
+    null,
+    `出撃編成は最大${MAX_INVASION_UNITS}部隊までです。これ以上追加できません。`
+  );
 }
 
 function clearStrategyWarningTimeout() {

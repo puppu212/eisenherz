@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=31"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=87"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=91"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -130,7 +130,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /#begin-battle\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(css, /#confirm-invasion\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(app, /const INVASION_DIALOG_FRONT_Z_INDEX = 70/);
-  assert.match(app, /function showInvasionDialog\(\) \{[\s\S]*?bringHudPanelToFront\(invasionDialog\);[\s\S]*?invasionDialog\.hidden = false;/s);
+  assert.match(app, /function showInvasionDialog\(\) \{\s*showFrontDialog\(invasionDialog\);\s*\}/);
+  assert.match(app, /function showFrontDialog\(dialog\) \{[\s\S]*?bringHudPanelToFront\(dialog\);[\s\S]*?dialog\.hidden = false;/s);
   assert.match(css, /\.commander-summary\s*\{[^}]*grid-template-columns:\s*96px minmax\(0, 1fr\);[^}]*min-height:\s*96px/s);
   assert.match(css, /\.commander-portrait\s*\{[^}]*width:\s*96px;[^}]*height:\s*96px;[^}]*aspect-ratio:\s*1 \/ 1/s);
   assert.match(css, /\.force-status div\s*\{[^}]*display:\s*grid;[^}]*border:\s*2px solid var\(--white\)/s);
