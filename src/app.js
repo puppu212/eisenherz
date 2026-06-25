@@ -3988,10 +3988,12 @@ function selectStrategyAttackTarget(spot) {
     return;
   }
 
+  const source = strategySpot(state.strategy.selectedSourceId);
+  const nextSourceId = canInvadeTarget(source, spot) ? source.id : null;
   const targetPanel = openStrategySpotPanel(spot);
   state.strategy.selectedSpotId = spot.id;
   state.strategy.selectedTargetId = spot.id;
-  state.strategy.selectedSourceId = null;
+  state.strategy.selectedSourceId = nextSourceId;
   state.strategy.selectedUnitIds.clear();
   pruneSelectedStrategyUnitsForTarget(spot);
   state.pendingOperation = null;
