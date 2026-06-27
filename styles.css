@@ -127,16 +127,40 @@ h1 {
 #battle-message {
   align-self: stretch;
   display: grid;
+  grid-template-rows: 13px 1fr;
   place-items: center;
   width: 100%;
   min-width: 0;
   max-width: 148px;
-  padding: 0 14px;
+  padding: 4px 14px 5px;
   border-right: 3px solid var(--white);
   border-left: 3px solid var(--white);
   text-align: center;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 10px;
+}
+
+.battle-clock small {
+  align-self: end;
+  color: var(--red);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: .12em;
+}
+
+.battle-clock b {
+  align-self: center;
+  font-family: Georgia, "Times New Roman", var(--font-ui);
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.battle-clock.is-status-text b {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: .04em;
 }
 
 .controls {
@@ -2242,7 +2266,10 @@ button:disabled:hover {
   }
   .team-count { padding: 3px 6px; font-size: 10px; }
   .team-count b { font-size: 20px; }
-  #battle-message { width: 100%; max-width: 116px; padding: 0 5px; font-size: 9px; }
+  #battle-message { width: 100%; max-width: 116px; padding: 3px 5px 4px; font-size: 9px; }
+  .battle-clock b { font-size: 18px; }
+  .battle-clock.is-status-text b { font-size: 10px; }
+  .battle-clock small { font-size: 7px; }
   .controls { grid-column: 2; grid-row: 1; gap: 6px; }
   .controls button { min-width: 58px; padding: 0 9px; }
   .start-screen { padding: 16px; }

@@ -36,6 +36,25 @@ test("default combat uses long range and fast shells", () => {
   assert.equal(battle.rules.artilleryHp, 70);
   assert.equal(battle.rules.fireInterval, 1.35);
   assert.equal(battle.rules.shellSpeed, 1400);
+  assert.equal(battle.rules.timeLimit, 300);
+});
+
+test("battle ends as a timeout defeat when the time limit expires", () => {
+  const battle = createBattle({
+    rules: {
+      timeLimit: 0.1,
+      attackRange: 0,
+      tankSpeed: 0,
+    },
+  });
+
+  updateBattle(battle, 0.05);
+  assert.equal(battle.winner, null);
+
+  updateBattle(battle, 0.05);
+  assert.equal(battle.winner, "enemy");
+  assert.equal(battle.timeExpired, true);
+  assert.equal(battle.elapsed, 0.1);
 });
 
 test("allies include two long-range artillery formations", () => {

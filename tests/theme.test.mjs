@@ -18,12 +18,12 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /button\s*\{[^}]*border:\s*3px solid var\(--white\)/s);
   assert.doesNotMatch(css, /box-shadow|text-shadow/);
   assert.match(app, /unit\.team === "ally" \? "#ffffff" : "#db0814"/);
-  assert.match(app, /from "\.\/simulation\.js\?v=10"/);
+  assert.match(app, /from "\.\/simulation\.js\?v=11"/);
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=31"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=91"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=94"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -45,6 +45,9 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /id="loading-message">INITIALIZING\.\.\.<\/span>/);
   assert.match(html, /id="ally-count">1<\/b>\s*<span id="ally-label">OWN<\/span>/);
   assert.match(html, /id="enemy-count">1<\/b>\s*<span id="enemy-label">NEUTRAL<\/span>/);
+  assert.match(html, /id="battle-message" class="battle-clock" aria-label="戦闘残り時間"/);
+  assert.match(html, /id="battle-clock-label">READY<\/small>/);
+  assert.match(html, /id="battle-clock">05:00<\/b>/);
   assert.match(html, /id="toggle-pause"[^>]*>END TURN<\/button>/);
   assert.match(html, /id="header-help"[^>]*aria-label="操作方法を開く"[^>]*>HELP<\/button>/);
   assert.doesNotMatch(html, /id="restart"/);
@@ -152,6 +155,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.battle-status\[hidden\]\s*\{\s*display:\s*none;/);
   assert.match(css, /\.controls button\s*\{[^}]*min-width:\s*72px/s);
   assert.match(css, /#battle-message\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*148px/s);
+  assert.match(css, /\.battle-clock b\s*\{[^}]*font-variant-numeric:\s*tabular-nums/s);
+  assert.match(css, /\.battle-clock\.is-status-text b\s*\{[^}]*font-size:\s*12px/s);
   assert.match(app, /battleStatus\.hidden = screen === FLOW_SCREEN\.FACTION;/);
   assert.match(app, /\["Enter", "Space"\]\.includes\(event\.code\)/);
   assert.match(app, /if \(!controlsDialog\.hidden\)/);
@@ -212,6 +217,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /function enterStrategyMode\(\) \{\s*closeStrategyTransientUi\(\);/s);
   assert.match(app, /function transitionToStrategyMode\(\) \{[\s\S]*?clearStrategySelection\(\);[\s\S]*?enterStrategyMode\(\);/s);
   assert.match(app, /function closeStrategyTransientUi\(\) \{[\s\S]*?state\.strategy\.openSpotPanels\.clear\(\)/s);
+  assert.match(app, /function resetStrategyTurnUi\(\) \{\s*closeStrategyTransientUi\(\);\s*clearStrategySelection\(\);\s*\}/s);
+  assert.match(app, /function endStrategyTurn\(\) \{[\s\S]*?resetStrategyTurnUi\(\);\s*state\.strategy\.phase = "enemy";/s);
   assert.doesNotMatch(app, /setAllyControlMode\(state\.battle, "hold"\)/);
   assert.match(app, /issueMoveOrder\(state\.battle, destinations\)/);
   assert.match(app, /function unitCardsInClientBounds\(bounds\)/);
@@ -249,7 +256,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.doesNotMatch(app, /strategyHoverScales/);
   assert.match(app, /function invadeSelectedSpot\(\)/);
   assert.match(app, /function endStrategyTurn\(\) \{[\s\S]*?state\.strategy\.spots\.every\(spot => spot\.owner === "player"\)[\s\S]*?showStrategyClearResult\(\);[\s\S]*?return;/s);
-  assert.match(app, /function showStrategyClearResult\(\) \{[\s\S]*?resultTitle\.textContent = "SCENARIO CLEAR"[\s\S]*?battleResult\.hidden = false;/s);
+  assert.match(app, /function showStrategyClearResult\(\) \{[\s\S]*?setHeaderStatus\("STATUS", "SCENARIO CLEAR"\)[\s\S]*?battleResult\.hidden = false;/s);
   assert.match(app, /const STRATEGY_CAMERA_SCALE = 1\.8;/);
   assert.match(app, /const STRATEGY_EDGE_SPEED = 780;/);
   assert.match(app, /const SCREEN_TRANSITION_HOLD_MS = 520;/);

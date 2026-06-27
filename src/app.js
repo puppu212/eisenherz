@@ -7,7 +7,7 @@ import {
   setAllyControlMode,
   teamCounts,
   updateBattle,
-} from "./simulation.js?v=10";
+} from "./simulation.js?v=11";
 import {
   CAMERA_LIMITS,
   cameraTransform,
@@ -66,6 +66,8 @@ const allyLabel = document.getElementById("ally-label");
 const enemyLabel = document.getElementById("enemy-label");
 const battleStatus = document.querySelector(".battle-status");
 const battleMessage = document.getElementById("battle-message");
+const battleClockLabel = document.getElementById("battle-clock-label");
+const battleClock = document.getElementById("battle-clock");
 const pauseButton = document.getElementById("toggle-pause");
 const headerBackButton = document.getElementById("header-back");
 const headerHelpButton = document.getElementById("header-help");
@@ -910,7 +912,7 @@ function enterFactionSelectionMode() {
   factionConfirmDialog.hidden = true;
   strategyExitDialog.hidden = true;
   pauseButton.disabled = true;
-  battleMessage.textContent = "SELECT FACTION";
+  setHeaderStatus("STATUS", "SELECT FACTION");
   allyCount.textContent = "—";
   enemyCount.textContent = "—";
   allyLabel.textContent = "FACTION";
@@ -1019,7 +1021,7 @@ function resetBattle(options = {}) {
   syncPauseButton();
   syncControlModeButton();
   syncFormationStyleButton();
-  battleMessage.textContent = state.started ? "ENGAGED" : "READY";
+  syncBattleClock();
   updateHud();
 }
 
@@ -1030,7 +1032,7 @@ function startBattle() {
     state.lastTime = performance.now();
     startScreen.hidden = true;
     syncPauseButton();
-    battleMessage.textContent = "ENGAGED";
+    syncBattleClock();
     updateHud();
   });
 }
@@ -1041,7 +1043,7 @@ function beginBriefedBattle() {
   state.lastTime = performance.now();
   battleBriefing.hidden = true;
   syncPauseButton();
-  battleMessage.textContent = "ENGAGED";
+  syncBattleClock();
   updateHud();
   canvas.focus?.();
 }
@@ -1131,7 +1133,7 @@ function togglePause() {
   if (!state.started || state.battle?.winner) return;
   state.paused = !state.paused;
   syncPauseButton();
-  battleMessage.textContent = state.paused ? "PAUSED" : battleLabel();
+  syncBattleClock();
 }
 
 function openEndTurnDialog() {
@@ -2047,11 +2049,7 @@ function updateHud() {
   syncControlModeButton();
   updateBattleResult(counts);
   syncPauseButton();
-  if (!state.started) {
-    battleMessage.textContent = "READY";
-  } else if (!state.paused) {
-    battleMessage.textContent = battleLabel();
-  }
+  syncBattleClock();
 }
 
 function updateBattleResult(counts) {
@@ -2062,11 +2060,13 @@ function updateBattleResult(counts) {
   }
   resolveBattleOperation(winner);
 
-  resultTitle.textContent = winner === "ally"
-    ? "ALLIED VICTORY"
-    : winner === "enemy"
-      ? "DEFEAT"
-      : "DRAW";
+  resultTitle.textContent = state.battle.timeExpired
+    ? "TIME OVER"
+    : winner === "ally"
+      ? "ALLIED VICTORY"
+      : winner === "enemy"
+        ? "DEFEAT"
+        : "DRAW";
   resultTitle.classList.toggle("is-defeat", winner === "enemy");
   resultAllies.textContent = counts.ally;
   resultEnemies.textContent = counts.enemy;
@@ -2087,6 +2087,26 @@ function formatBattleTime(seconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const remainingSeconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function formatBattleTimeRemaining(battle) {
+  const limit = battle?.rules?.timeLimit ?? 0;
+  if (limit <= 0) return "--:--";
+  return formatBattleTime(Math.ceil(Math.max(0, limit - battle.elapsed)));
+}
+
+function setHeaderStatus(label, value) {
+  battleMessage.classList.add("battle-clock");
+  battleMessage.classList.toggle("is-status-text", !/^\d/.test(value));
+  if (!battleMessage.contains(battleClockLabel)) battleMessage.append(battleClockLabel);
+  if (!battleMessage.contains(battleClock)) battleMessage.append(battleClock);
+  battleClockLabel.textContent = label;
+  battleClock.textContent = value;
+}
+
+function syncBattleClock() {
+  if (!state.battle) return;
+  setHeaderStatus(battleClockLabelText(), formatBattleTimeRemaining(state.battle));
 }
 
 function updateCommanderPanel(counts) {
@@ -4164,9 +4184,16 @@ function updateSelectionBox(drag) {
 
 function battleLabel() {
   if (!state.battle?.winner) return "ENGAGED";
+  if (state.battle.timeExpired) return "TIME OVER";
   if (state.battle.winner === "ally") return "ALLIED VICTORY";
   if (state.battle.winner === "enemy") return "ENEMY VICTORY";
   return "DRAW";
+}
+
+function battleClockLabelText() {
+  if (!state.started) return "READY";
+  if (state.paused) return "PAUSED";
+  return battleLabel();
 }
 
 function startStrategySelection(event) {
@@ -4418,12 +4445,18 @@ function clearStrategySelection() {
   updateStrategySpotPanels();
 }
 
+function resetStrategyTurnUi() {
+  closeStrategyTransientUi();
+  clearStrategySelection();
+}
+
 function endStrategyTurn() {
   if (state.strategy.phase !== "player") return;
   if (state.strategy.spots.every(spot => spot.owner === "player")) {
     showStrategyClearResult();
     return;
   }
+  resetStrategyTurnUi();
   state.strategy.phase = "enemy";
   state.strategy.message = "敵ターン: 現在は行動なし";
   updateStrategyHud();
@@ -4432,7 +4465,6 @@ function endStrategyTurn() {
     state.strategy.turn += 1;
     state.strategy.phase = "player";
     const income = collectPlayerIncome(state.strategy);
-    clearStrategySelection();
     state.strategy.message = `収入 +${income}: ${STRATEGY_MESSAGE_SELECT_TARGET}`;
     updateStrategyHud();
   }, 500);
@@ -4442,7 +4474,7 @@ function showStrategyClearResult() {
   updateGameFlow(FLOW_EVENT.CLEAR_SCENARIO);
   state.strategyCleared = true;
   closeStrategyTransientUi();
-  battleMessage.textContent = "SCENARIO CLEAR";
+  setHeaderStatus("STATUS", "SCENARIO CLEAR");
   resultTitle.textContent = "SCENARIO CLEAR";
   resultTitle.classList.remove("is-defeat");
   resultAllies.textContent = String(state.strategy.spots.length);
@@ -4462,7 +4494,7 @@ function updateStrategyHud() {
   const target = strategySpot(state.strategy.selectedTargetId);
   allyCount.textContent = ownCount;
   enemyCount.textContent = neutralCount;
-  battleMessage.textContent = state.strategy.phase === "player" ? "STRATEGY" : "ENEMY TURN";
+  setHeaderStatus("STATUS", state.strategy.phase === "player" ? "STRATEGY" : "ENEMY TURN");
   strategyTurn.textContent = String(state.strategy.turn);
   strategyPhase.textContent = state.strategy.phase === "player" ? "PLAYER" : "ENEMY";
   strategyIncome.textContent = String(calculatePlayerIncome(state.strategy));

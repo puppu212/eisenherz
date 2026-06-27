@@ -21,6 +21,7 @@ export const DEFAULT_RULES = Object.freeze({
   artillerySplashDamage: 30,
   artilleryBlastRadius: 120,
   moveArrivalRadius: 12,
+  timeLimit: 300,
 });
 
 const FIRE_TARGET_DIRECTION_COSINE = Math.cos(Math.PI / 4);
@@ -63,6 +64,7 @@ export function createBattle(options = {}) {
       shells: [],
       explosions: [],
       elapsed: 0,
+      timeExpired: false,
       winner: null,
       nextShellId: 1,
       nextExplosionId: 1,
@@ -124,6 +126,7 @@ export function createBattle(options = {}) {
     shells: [],
     explosions: [],
     elapsed: 0,
+    timeExpired: false,
     winner: null,
     nextShellId: 1,
     nextExplosionId: 1,
@@ -183,6 +186,12 @@ export function updateBattle(battle, deltaSeconds) {
   updateExplosions(battle, delta);
   if (battle.winner) return battle;
   battle.elapsed += delta;
+  if (battle.rules.timeLimit > 0 && battle.elapsed >= battle.rules.timeLimit) {
+    battle.elapsed = battle.rules.timeLimit;
+    battle.timeExpired = true;
+    battle.winner = "enemy";
+    return battle;
+  }
 
   for (const unit of battle.units) {
     if (!unit.alive) continue;

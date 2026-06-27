@@ -17,7 +17,10 @@
       </div>
       <div class="battle-status" aria-live="polite">
         <span class="team-count ally"><b id="ally-count">1</b> <span id="ally-label">OWN</span></span>
-        <span id="battle-message">ENGAGED</span>
+        <span id="battle-message" class="battle-clock" aria-label="戦闘残り時間">
+          <small id="battle-clock-label">READY</small>
+          <b id="battle-clock">05:00</b>
+        </span>
         <span class="team-count enemy"><b id="enemy-count">1</b> <span id="enemy-label">NEUTRAL</span></span>
       </div>
       <div class="controls">
@@ -337,6 +340,6 @@
     </section>
   </main>
 
-  <script type="module" src="./src/app.js?v=91"></script>
+  <script type="module" src="./src/app.js?v=94"></script>
 </body>
 </html>
