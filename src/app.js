@@ -28,7 +28,7 @@ import {
   transitionGameFlow,
 } from "./game-flow.js";
 import {
-  MAX_INVASION_UNITS,
+  MAX_INVASION_FORMATIONS,
   STRATEGY_UNIT_CATALOG,
   areStrategySpotsLinked as areSpotsLinked,
   calculatePlayerIncome,
@@ -43,7 +43,7 @@ import {
   isStrategyUnitActionAvailable,
   resolveStrategyBattle,
   selectedStrategyUnits as getSelectedStrategyUnits,
-} from "./strategy.js?v=8";
+} from "./strategy.js?v=9";
 
 const canvas = document.getElementById("battlefield");
 const ctx = canvas.getContext("2d");
@@ -2769,7 +2769,7 @@ function buildStrategySortieSummary(target, selectedUnits, operation) {
   summary.innerHTML = `
     <div><dt>FROM</dt><dd>${sourceLabel}</dd></div>
     <div><dt>TARGET</dt><dd>${target.name}</dd></div>
-    <div><dt>UNITS</dt><dd>${selectedUnits.length} / ${MAX_INVASION_UNITS}</dd></div>
+    <div><dt>FORMATIONS</dt><dd>${strategyFormationCount(selectedUnits)} / ${MAX_INVASION_FORMATIONS}</dd></div>
     <div><dt>ENEMY</dt><dd>${operation?.enemyUnits.length ?? target.units.filter(unit => unit.alive).length}</dd></div>
   `;
   return summary;
@@ -2814,7 +2814,9 @@ function buildStrategySortieUnits(selectedUnits) {
 
       const label = document.createElement("div");
       label.className = "strategy-formation-label";
+      label.dataset.sortieFormation = unitsInFormation[0].formationId;
       label.textContent = TYPE_LABELS[unitsInFormation[0].type] ?? "FORMATION";
+      label.title = "右クリックで部隊全体を出撃編成から外す";
 
       const unitList = document.createElement("div");
       unitList.className = "formation-units";
@@ -2834,7 +2836,7 @@ function createStrategySortieUnitCard(unit) {
   const card = createStrategyUnitCard(unit, false);
   card.classList.add("strategy-sortie-unit-card");
   card.dataset.sortieRemoveUnit = unit.id;
-  card.title = "クリックで出撃編成から外す";
+  card.title = "クリックまたは右クリックでこのユニットを出撃編成から外す";
   return card;
 }
 
@@ -3211,6 +3213,26 @@ function handleStrategySortiePanelClick(event) {
 }
 
 function handleStrategySpotPanelContextMenu(event) {
+  const sortiePanel = event.target.closest(".strategy-sortie-panel");
+  if (sortiePanel) {
+    event.preventDefault();
+    event.stopPropagation();
+    bringHudPanelToFront(sortiePanel);
+    const unitCard = event.target.closest("[data-sortie-remove-unit]");
+    if (unitCard) {
+      removeStrategySortieUnitIds([unitCard.dataset.sortieRemoveUnit]);
+      return;
+    }
+    const formationRow = event.target.closest("[data-sortie-formation]");
+    if (formationRow) {
+      const unitIds = selectedStrategyUnits()
+        .filter(unit => unit.formationId === formationRow.dataset.sortieFormation)
+        .map(unit => unit.id);
+      removeStrategySortieUnitIds(unitIds);
+    }
+    return;
+  }
+
   const factionPanel = event.target.closest(".strategy-faction-info-panel");
   if (factionPanel) {
     event.preventDefault();
@@ -3228,6 +3250,16 @@ function handleStrategySpotPanelContextMenu(event) {
     return;
   }
   closeStrategySpotPanel(panel.dataset.spotId);
+}
+
+function removeStrategySortieUnitIds(ids) {
+  for (const id of ids) {
+    state.strategy.selectedUnitIds.delete(id);
+    state.strategyHighlightedUnitIds.delete(id);
+  }
+  state.strategy.message = strategySelectionMessage();
+  updateStrategyHud();
+  updateStrategySpotPanels();
 }
 
 function closeStrategySpotPanel(spotId) {
@@ -3399,16 +3431,37 @@ function canSelectStrategySpotUnits(spot) {
 
 function addStrategyUnitIdsWithinLimit(ids) {
   let rejected = false;
+  const selectedFormationKeys = new Set(selectedStrategyUnits().map(strategyFormationKey));
   for (const id of ids) {
     if (state.strategy.selectedUnitIds.has(id)) continue;
-    if (state.strategy.selectedUnitIds.size >= MAX_INVASION_UNITS) {
-      state.strategy.message = `一度の戦闘に参加できる部隊は${MAX_INVASION_UNITS}部隊までです`;
+    const unit = strategyUnitById(id);
+    if (!unit) continue;
+    const formationKey = strategyFormationKey(unit);
+    if (!selectedFormationKeys.has(formationKey) && selectedFormationKeys.size >= MAX_INVASION_FORMATIONS) {
+      state.strategy.message = `一度の戦闘に参加できる部隊は${MAX_INVASION_FORMATIONS}部隊までです`;
       rejected = true;
       break;
     }
     state.strategy.selectedUnitIds.add(id);
+    selectedFormationKeys.add(formationKey);
   }
   if (rejected) showStrategyCapacityWarning();
+}
+
+function strategyUnitById(id) {
+  for (const spot of state.strategy.spots) {
+    const unit = spot.units.find(candidate => candidate.id === id);
+    if (unit) return unit;
+  }
+  return null;
+}
+
+function strategyFormationKey(unit) {
+  return `${unit.spotId}:${unit.formationId}`;
+}
+
+function strategyFormationCount(units = selectedStrategyUnits()) {
+  return new Set(units.map(strategyFormationKey)).size;
 }
 
 function removeSelectedStrategyUnitsFromSpot(spotId) {
@@ -3419,8 +3472,9 @@ function removeSelectedStrategyUnitsFromSpot(spotId) {
 }
 
 function strategySelectionMessage() {
-  if (state.strategy.selectedUnitIds.size >= MAX_INVASION_UNITS) {
-    return `最大${MAX_INVASION_UNITS}部隊を選択中です。出撃ボタンで確認`;
+  const formationCount = strategyFormationCount();
+  if (formationCount >= MAX_INVASION_FORMATIONS) {
+    return `最大${MAX_INVASION_FORMATIONS}部隊を選択中です。出撃ボタンで確認`;
   }
   if (state.strategy.selectedUnitIds.size > 0) {
     return state.strategy.selectedTargetId
@@ -3456,7 +3510,7 @@ function syncStrategySelectedForces() {
     fragment.append(image);
   }
   const count = document.createElement("b");
-  count.textContent = String(selectedUnits.length);
+  count.textContent = String(strategyFormationCount(selectedUnits));
   fragment.append(count);
   strategySelectedForces.replaceChildren(fragment);
 }
@@ -4034,9 +4088,9 @@ function startStrategyForceDrag(event, captureElement = strategySelectedForces, 
   const startsOnSelectedUnit = !clickToggle || (clickToggle.unitIds ?? []).some(id =>
     visuallySelectedIds.includes(id)
   );
-  const dragUnitIds = startsOnSelectedUnit
+  const dragUnitIds = clickToggle?.type === "unit" && startsOnSelectedUnit
     ? visuallySelectedIds
-    : clickToggle?.unitIds ?? [];
+    : clickToggle?.unitIds ?? visuallySelectedIds;
   const dragUnits = clickToggle
     ? strategyUnitsByIds(clickToggle.spotId, dragUnitIds)
     : units;
@@ -4202,13 +4256,15 @@ function commitStrategyForceDragSelection(spotId, ids, additive = true) {
 }
 
 function wouldStrategyForceDropExceedLimit(spotId, ids, additive = true) {
-  if (!additive) return ids.length > MAX_INVASION_UNITS;
   const spot = strategySpot(spotId);
   if (!spot) return false;
   const eligible = new Set(spot.units.filter(unit => canSelectStrategyUnit(unit)).map(unit => unit.id));
-  const selectedIds = new Set(selectedStrategyUnits().map(unit => unit.id));
-  const addedCount = ids.filter(id => eligible.has(id) && !selectedIds.has(id)).length;
-  return selectedIds.size + addedCount > MAX_INVASION_UNITS;
+  const candidateUnits = spot.units.filter(unit => eligible.has(unit.id) && ids.includes(unit.id));
+  const formationKeys = new Set(
+    (additive ? selectedStrategyUnits() : []).map(strategyFormationKey)
+  );
+  for (const unit of candidateUnits) formationKeys.add(strategyFormationKey(unit));
+  return formationKeys.size > MAX_INVASION_FORMATIONS;
 }
 
 function suppressNextStrategyPanelClick() {
@@ -4680,12 +4736,12 @@ function refreshStrategyTargetSelectionDialog() {
   const target = strategySpot(state.strategy.selectedTargetId);
   if (!target) return;
   const sourceSpots = invasionSourceSpotsForTarget(state.strategy, target);
-  const selectedCount = selectedStrategyUnits().length;
+  const selectedCount = strategyFormationCount();
   invasionTitle.textContent = `${target.name}への出撃準備`;
   invasionSummary.textContent = !state.strategy.selectedSourceId
     ? `隣接する自領地を選択してください。候補 ${sourceSpots.length}領地`
     : selectedCount > 0
-      ? `選択中 ${selectedCount} / ${MAX_INVASION_UNITS}部隊。出撃編成パネルの出撃ボタンで確認します。`
+      ? `選択中 ${selectedCount} / ${MAX_INVASION_FORMATIONS}部隊。出撃編成パネルの出撃ボタンで確認します。`
       : "出撃するユニットを出撃編成へドラッグ&ドロップしてください。";
 }
 
@@ -4704,7 +4760,7 @@ function showInvalidStrategySourceWarning(spot, message = "侵攻先に隣接す
 function showStrategyCapacityWarning() {
   showInvalidStrategySourceWarning(
     null,
-    `出撃編成は最大${MAX_INVASION_UNITS}部隊までです。これ以上追加できません。`
+    `出撃編成は最大${MAX_INVASION_FORMATIONS}部隊までです。これ以上追加できません。`
   );
 }
 

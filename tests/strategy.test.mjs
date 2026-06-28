@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  MAX_INVASION_FORMATIONS,
   areStrategySpotsLinked,
   calculatePlayerIncome,
   canHireStrategyUnit,
@@ -251,7 +252,7 @@ test("victory moves surviving units from multiple source spots into the target",
   assert.ok(target.units.every(unit => unit.spotId === target.id));
 });
 
-test("an invasion operation is capped at twenty-four allied units", () => {
+test("an invasion operation is capped at twenty-four allied formations", () => {
   const strategy = createStrategyState({
     width: 100,
     height: 100,
@@ -262,9 +263,9 @@ test("an invasion operation is capped at twenty-four allied units", () => {
         x: 20,
         y: 50,
         owner: "player",
-        units: Array.from({ length: 30 }, (_, index) => ({
-          type: index % 5 === 0 ? "artillery" : "tank",
-          formationIndex: Math.floor(index / 4),
+        units: Array.from({ length: 25 * 8 }, (_, index) => ({
+          type: Math.floor(index / 8) % 5 === 0 ? "artillery" : "tank",
+          formationIndex: Math.floor(index / 8),
         })),
       },
       { id: "target", name: "TARGET", x: 50, y: 50, owner: "enemy", units: [] },
@@ -276,8 +277,9 @@ test("an invasion operation is capped at twenty-four allied units", () => {
 
   const operation = createInvasionOperation(strategy);
 
-  assert.equal(operation.unitIds.length, 24);
-  assert.equal(operation.alliedUnits.length, 24);
+  assert.equal(operation.unitIds.length, MAX_INVASION_FORMATIONS * 8);
+  assert.equal(operation.alliedUnits.length, MAX_INVASION_FORMATIONS * 8);
+  assert.equal(new Set(operation.alliedUnits.map(unit => unit.formationId)).size, MAX_INVASION_FORMATIONS);
 });
 
 test("an invasion operation excludes units that already acted this turn", async () => {

@@ -19,12 +19,12 @@ test("the interface follows the black red and white design system", async () => 
   assert.doesNotMatch(css, /box-shadow|text-shadow/);
   assert.match(app, /unit\.team === "ally" \? "#ffffff" : "#db0814"/);
   assert.match(app, /from "\.\/simulation\.js\?v=12"/);
-  assert.match(app, /from "\.\/strategy\.js\?v=8"/);
+  assert.match(app, /from "\.\/strategy\.js\?v=9"/);
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
   assert.match(html, /href="\.\/styles\.css\?v=34"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=102"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=106"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -186,9 +186,10 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /type: "all",\s*spotId: spot\.id,\s*unitIds: ids/s);
   assert.match(app, /function createStrategyDragGhost\(units\)/);
   assert.match(app, /function buildStrategySortieUnits\(selectedUnits\) \{[\s\S]*?formations\.has\(unit\.formationId\)[\s\S]*?for \(const unitsInFormation of formations\.values\(\)\)/);
+  assert.match(app, /function handleStrategySpotPanelContextMenu\(event\) \{[\s\S]*?\[data-sortie-remove-unit\][\s\S]*?\[data-sortie-formation\][\s\S]*?removeStrategySortieUnitIds\(unitIds\);/);
   assert.match(app, /function strategyVisuallySelectedUnitIds\(spotId\)/);
   assert.match(app, /const allSelected = nextIds\.length > 0 && nextIds\.every\(id =>[\s\S]*?state\.strategy\.selectedUnitIds\.delete\(id\);/);
-  assert.match(app, /const dragUnitIds = startsOnSelectedUnit\s*\? visuallySelectedIds\s*:\s*clickToggle\?\.unitIds \?\? \[\];/);
+  assert.match(app, /const dragUnitIds = clickToggle\?\.type === "unit" && startsOnSelectedUnit\s*\? visuallySelectedIds\s*:\s*clickToggle\?\.unitIds \?\? visuallySelectedIds;/);
   assert.match(app, /if \(!drag\.moved\) \{[\s\S]*?toggleStrategyUnitHighlight\(clickToggle\.spotId, clickToggle\.unitIds \?\? \[\], additive\);/);
   assert.match(app, /commitStrategyForceDragSelection\(clickToggle\.spotId, unitIds, additive\);/);
   assert.match(app, /if \(event\.target\.closest\?\.\("button"\)\) return;/);

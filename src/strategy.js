@@ -6,7 +6,7 @@ export const STRATEGY_UNIT_CATALOG = Object.freeze({
 export const DEFAULT_SPOT_ECONOMY = 1000;
 export const STRATEGY_FORMATION_UNIT_LIMIT = 8;
 export const STRATEGY_SPOT_FORMATION_LIMIT = 12;
-export const MAX_INVASION_UNITS = 24;
+export const MAX_INVASION_FORMATIONS = 24;
 
 const INITIAL_PLAYER_FORMATIONS = Object.freeze([
   { type: "tank", count: 8 },
@@ -94,13 +94,19 @@ export function selectedStrategyUnits(strategy, targetId = strategy.selectedTarg
   const sourceSpots = target
     ? invasionSourceSpotsForTarget(strategy, target)
     : [getStrategySpot(strategy, strategy.selectedSourceId)].filter(Boolean);
-  return sourceSpots
+  const selectedUnits = sourceSpots
     .flatMap(spot => spot.units)
     .filter(unit =>
       strategy.selectedUnitIds.has(unit.id) &&
       isStrategyUnitActionAvailable(strategy, unit)
-    )
-    .slice(0, MAX_INVASION_UNITS);
+    );
+  const selectedFormationIds = new Set();
+  return selectedUnits.filter(unit => {
+    if (selectedFormationIds.has(unit.formationId)) return true;
+    if (selectedFormationIds.size >= MAX_INVASION_FORMATIONS) return false;
+    selectedFormationIds.add(unit.formationId);
+    return true;
+  });
 }
 
 export function isStrategyUnitActionAvailable(strategy, unit) {
