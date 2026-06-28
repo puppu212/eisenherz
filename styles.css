@@ -1416,10 +1416,6 @@ button:disabled:hover {
   border-bottom: 0;
 }
 
-.strategy-sortie-unit-card {
-  pointer-events: auto;
-}
-
 .strategy-sortie-units .formation-units {
   display: grid;
   grid-template-columns: repeat(8, 58px);
@@ -1596,6 +1592,10 @@ button:disabled:hover {
 
 .strategy-unit-card:not(button) {
   pointer-events: none;
+}
+
+.strategy-unit-card.strategy-sortie-unit-card {
+  pointer-events: auto;
 }
 
 .strategy-unit-card.is-selected {

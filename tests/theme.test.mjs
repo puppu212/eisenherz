@@ -23,7 +23,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
-  assert.match(html, /href="\.\/styles\.css\?v=34"/);
+  assert.match(html, /href="\.\/styles\.css\?v=35"/);
   assert.match(html, /src="\.\/src\/app\.js\?v=106"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
@@ -135,6 +135,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.strategy-drag-ghost\.is-valid\s*\{[^}]*border-color:\s*var\(--white\)/s);
   assert.match(css, /\.strategy-sortie-panel\s*\{[^}]*width:\s*min\(390px, calc\(100vw - 28px\)\)/s);
   assert.match(css, /\.strategy-sortie-units \.formation-units\s*\{[^}]*grid-template-columns:\s*repeat\(8, 58px\)/s);
+  assert.match(css, /\.strategy-unit-card\.strategy-sortie-unit-card\s*\{[^}]*pointer-events:\s*auto/s);
   assert.match(css, /#begin-battle\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(css, /#confirm-invasion\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(app, /const INVASION_DIALOG_FRONT_Z_INDEX = 70/);
