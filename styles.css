@@ -577,6 +577,8 @@ button:disabled:hover {
   touch-action: none;
 }
 
+#battlefield.is-v2-targeting { cursor: crosshair; }
+
 .loading {
   position: fixed;
   inset: 0;
@@ -1416,6 +1418,12 @@ button:disabled:hover {
 
 .strategy-sortie-unit-card {
   pointer-events: auto;
+}
+
+.strategy-sortie-units .formation-units {
+  display: grid;
+  grid-template-columns: repeat(8, 58px);
+  align-content: start;
 }
 
 .strategy-sortie-footer {

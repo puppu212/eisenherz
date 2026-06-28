@@ -9,21 +9,15 @@ export const STRATEGY_SPOT_FORMATION_LIMIT = 12;
 export const MAX_INVASION_UNITS = 24;
 
 const INITIAL_PLAYER_FORMATIONS = Object.freeze([
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "artillery", count: 4 },
-  { type: "artillery", count: 4 },
+  { type: "tank", count: 8 },
+  { type: "tank", count: 8 },
+  { type: "artillery", count: 8 },
 ]);
 
 const INITIAL_ENEMY_FORMATIONS = Object.freeze([
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
-  { type: "tank", count: 4 },
+  { type: "tank", count: 8 },
+  { type: "tank", count: 8 },
+  { type: "tank", count: 8 },
 ]);
 
 export function createStrategyState(data, playerFactionId = "deutschland") {

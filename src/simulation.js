@@ -73,12 +73,9 @@ export function createBattle(options = {}) {
   }
 
   const alliedFormations = [
-    ["tank-a", "frontline-tanks-a", "tank", "frontline", -330, -125],
-    ["tank-b", "frontline-tanks-b", "tank", "frontline", -100, -60],
-    ["tank-c", "frontline-tanks-c", "tank", "frontline", 130, 5],
-    ["tank-d", "frontline-tanks-d", "tank", "frontline", 360, 70],
-    ["artillery-a", "rear-artillery-a", "artillery", "rearGuard", -190, 235],
-    ["artillery-b", "rear-artillery-b", "artillery", "rearGuard", 190, 300],
+    ["tank-a", "frontline-tanks-a", "tank", "frontline", -210, -95],
+    ["tank-b", "frontline-tanks-b", "tank", "frontline", 210, 25],
+    ["artillery-a", "rear-artillery-a", "artillery", "rearGuard", 0, 270],
   ];
   for (const [id, formation, type, role, offsetX, offsetY] of alliedFormations) {
     createFormation(units, {
@@ -87,7 +84,7 @@ export function createBattle(options = {}) {
       formationId: `ally-${formation}`,
       type,
       role,
-      count: 4,
+      count: 8,
       origin: { x: allyOrigin.x + offsetX, y: allyOrigin.y + offsetY },
       direction: { x: 1, y: -1 },
       rules,
@@ -95,12 +92,9 @@ export function createBattle(options = {}) {
   }
 
   const enemyFormations = [
-    ["tank-a", "frontline-tanks-a", -470, -145],
-    ["tank-b", "frontline-tanks-b", -285, -80],
-    ["tank-c", "frontline-tanks-c", -100, -15],
-    ["tank-d", "frontline-tanks-d", 85, 50],
-    ["tank-e", "frontline-tanks-e", 270, 115],
-    ["tank-f", "frontline-tanks-f", 455, 180],
+    ["tank-a", "frontline-tanks-a", -320, -110],
+    ["tank-b", "frontline-tanks-b", 0, 0],
+    ["tank-c", "frontline-tanks-c", 320, 110],
   ];
   for (const [id, formation, offsetX, offsetY] of enemyFormations) {
     createFormation(units, {
@@ -109,7 +103,7 @@ export function createBattle(options = {}) {
       formationId: `enemy-${formation}`,
       type: "tank",
       role: "frontline",
-      count: 4,
+      count: 8,
       origin: { x: enemyOrigin.x + offsetX, y: enemyOrigin.y + offsetY },
       direction: { x: -1, y: 1 },
       rules,
@@ -265,6 +259,29 @@ export function issueMoveOrder(battle, unitDestinations) {
     unit.command = { type: "move", x, y, angle };
     unit.state = "moving";
   }
+}
+
+export function applyV2Strike(battle, x, y, options = {}) {
+  if (!battle || battle.winner || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+  const team = options.team ?? "ally";
+  const innerRadius = options.innerRadius ?? 120;
+  const outerRadius = Math.max(innerRadius, options.outerRadius ?? 320);
+  const innerDamage = options.innerDamage ?? 130;
+  const outerDamage = options.outerDamage ?? 60;
+  const hitUnitIds = [];
+
+  for (const unit of battle.units) {
+    if (!unit.alive || unit.team === team) continue;
+    const distance = Math.hypot(unit.x - x, unit.y - y);
+    if (distance > outerRadius) continue;
+    damageUnit(battle, unit, distance <= innerRadius ? innerDamage : outerDamage);
+    hitUnitIds.push(unit.id);
+  }
+
+  createExplosionAt(battle, x, y);
+  removeDestroyedUnitsFromTargets(battle);
+  battle.winner = determineWinner(battle.units);
+  return hitUnitIds;
 }
 
 export function clearMoveOrders(battle) {

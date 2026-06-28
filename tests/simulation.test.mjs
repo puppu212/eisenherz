@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyV2Strike,
   clearFireTarget,
   clearMoveOrders,
   createBattle,
@@ -12,6 +13,34 @@ import {
   teamCounts,
   updateBattle,
 } from "../src/simulation.js";
+
+test("V2 strike applies two damage zones without friendly fire", () => {
+  const battle = createBattle({
+    alliedUnits: [{ id: "ally", type: "tank", formationId: "ally" }],
+    enemyUnits: [
+      { id: "enemy-core", type: "tank", formationId: "enemy-core" },
+      { id: "enemy-edge", type: "tank", formationId: "enemy-edge" },
+      { id: "enemy-safe", type: "tank", formationId: "enemy-safe" },
+    ],
+  });
+  const ally = battle.units.find(unit => unit.id === "ally");
+  const core = battle.units.find(unit => unit.id === "enemy-core");
+  const edge = battle.units.find(unit => unit.id === "enemy-edge");
+  const safe = battle.units.find(unit => unit.id === "enemy-safe");
+  Object.assign(ally, { x: 500, y: 500 });
+  Object.assign(core, { x: 500, y: 500 });
+  Object.assign(edge, { x: 750, y: 500 });
+  Object.assign(safe, { x: 900, y: 500 });
+
+  const hits = applyV2Strike(battle, 500, 500);
+
+  assert.deepEqual(hits, ["enemy-core", "enemy-edge"]);
+  assert.equal(ally.hp, ally.maxHp);
+  assert.equal(core.alive, false);
+  assert.equal(edge.hp, edge.maxHp - 60);
+  assert.equal(safe.hp, safe.maxHp);
+  assert.equal(battle.explosions.length, 2);
+});
 
 test("all unit types use the same horizontal facing rule", () => {
   assert.equal(facingFromDirection(10), "right");
@@ -57,7 +86,7 @@ test("battle ends as a timeout defeat when the time limit expires", () => {
   assert.equal(battle.elapsed, 0.1);
 });
 
-test("allies include two long-range artillery formations", () => {
+test("allies include one full long-range artillery formation", () => {
   const battle = createBattle({ width: 3200, height: 3200 });
   const artillery = battle.units.filter(unit => unit.type === "artillery");
   const counts = teamCounts(battle);
@@ -65,7 +94,7 @@ test("allies include two long-range artillery formations", () => {
   assert.equal(artillery.length, 8);
   assert.ok(artillery.every(unit => unit.team === "ally"));
   assert.ok(artillery.every(unit => unit.role === "rearGuard"));
-  assert.equal(new Set(artillery.map(unit => unit.formationId)).size, 2);
+  assert.equal(new Set(artillery.map(unit => unit.formationId)).size, 1);
   assert.ok(artillery.every(unit => unit.hp === 70 && unit.maxHp === 70));
   assert.ok(artillery.every(unit => unit.x < 1600 && unit.y > 1600));
   assert.equal(counts.ally, 24);
@@ -81,7 +110,7 @@ test("allied tanks are split into frontline formations", () => {
 
   assert.equal(tanks.length, 16);
   assert.ok(tanks.every(unit => unit.role === "frontline"));
-  assert.equal(new Set(tanks.map(unit => unit.formationId)).size, 4);
+  assert.equal(new Set(tanks.map(unit => unit.formationId)).size, 2);
   assert.ok(tanks.every(unit => unit.hp === 130 && unit.maxHp === 130));
 });
 
@@ -91,7 +120,7 @@ test("enemy frontline contains enough tanks to contest the enlarged force", () =
 
   assert.equal(enemies.length, 24);
   assert.ok(enemies.every(unit => unit.type === "tank"));
-  assert.equal(new Set(enemies.map(unit => unit.formationId)).size, 6);
+  assert.equal(new Set(enemies.map(unit => unit.formationId)).size, 3);
   assert.ok(enemies.every(unit => unit.hp === 130 && unit.maxHp === 130));
 });
 

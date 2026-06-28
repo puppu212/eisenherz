@@ -27,6 +27,14 @@ test("strategy state builds the initial formations and route graph", async () =>
 
   assert.equal(source.units.length, 24);
   assert.equal(source.units.filter(unit => unit.type === "artillery").length, 8);
+  assert.equal(
+    [...new Set(source.units.filter(unit => unit.type === "tank").map(unit => unit.formationId))].length,
+    2
+  );
+  assert.equal(
+    [...new Set(source.units.filter(unit => unit.type === "artillery").map(unit => unit.formationId))].length,
+    1
+  );
   assert.equal(secondSource.owner, "player");
   assert.equal(secondSource.units.length, 24);
   assert.equal(target.owner, "enemy");
@@ -70,7 +78,10 @@ test("hiring spends funds and adds a unit to an owned spot", async () => {
   assert.equal(strategy.funds.player, 9820);
   assert.equal(source.units.length, 25);
   assert.equal(unit.type, "artillery");
-  assert.equal(unit.formationId, source.units.find(candidate => candidate.type === "artillery").formationId);
+  assert.notEqual(unit.formationId, source.units.find(candidate =>
+    candidate.type === "artillery" && candidate.id !== unit.id
+  ).formationId);
+  assert.equal(source.units.filter(candidate => candidate.formationId === unit.formationId).length, 1);
   assert.equal(unit.availableTurn, strategy.turn + 1);
   assert.equal(isStrategyUnitActionAvailable(strategy, unit), false);
   assert.equal(strategy.selectedSourceId, source.id);
@@ -82,14 +93,16 @@ test("hiring fills open formations of the same unit type before creating one", a
   const source = strategy.spots.find(spot => spot.id === "spot1");
   const tankFormationId = source.units.find(unit => unit.type === "tank").formationId;
   const artilleryFormationId = source.units.find(unit => unit.type === "artillery").formationId;
+  source.units.splice(source.units.findIndex(unit => unit.formationId === tankFormationId), 1);
+  source.units.splice(source.units.findIndex(unit => unit.formationId === artilleryFormationId), 1);
 
   const tank = hireStrategyUnit(strategy, source.id, "tank");
   const artillery = hireStrategyUnit(strategy, source.id, "artillery");
 
   assert.equal(tank.formationId, tankFormationId);
   assert.equal(artillery.formationId, artilleryFormationId);
-  assert.equal(source.units.filter(unit => unit.formationId === tankFormationId).length, 5);
-  assert.equal(source.units.filter(unit => unit.formationId === artilleryFormationId).length, 5);
+  assert.equal(source.units.filter(unit => unit.formationId === tankFormationId).length, 8);
+  assert.equal(source.units.filter(unit => unit.formationId === artilleryFormationId).length, 8);
 });
 
 test("hiring creates a new formation only when all matching formations are full", async () => {

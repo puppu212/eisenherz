@@ -9,6 +9,8 @@ test("battle sprites use the WebP asset set", async () => {
     access(new URL("../assets/unit/sov1.webp", import.meta.url)),
     access(new URL("../assets/effect/tank_gun.webp", import.meta.url)),
     access(new URL("../assets/effect/grenades.webp", import.meta.url)),
+    access(new URL("../assets/effect/v2.webp", import.meta.url)),
+    access(new URL("../assets/cutin/cutin2.webp", import.meta.url)),
     access(new URL("../assets/character/char1.webp", import.meta.url)),
     access(new URL("../assets/world/world.webp", import.meta.url)),
     access(new URL("../assets/spot/Berlin.webp", import.meta.url)),
@@ -39,6 +41,8 @@ test("battle sprites use the WebP asset set", async () => {
   assert.match(source, /sov1\.webp/);
   assert.match(source, /tank_gun\.webp/);
   assert.match(source, /grenades\.webp/);
+  assert.match(source, /v2\.webp/);
+  assert.match(source, /cutin2\.webp/);
   assert.match(source, /world\.webp/);
   assert.match(source, /Berlin\.webp/);
   assert.match(source, /spot\.webp/);

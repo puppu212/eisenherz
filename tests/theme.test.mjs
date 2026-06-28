@@ -18,12 +18,13 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /button\s*\{[^}]*border:\s*3px solid var\(--white\)/s);
   assert.doesNotMatch(css, /box-shadow|text-shadow/);
   assert.match(app, /unit\.team === "ally" \? "#ffffff" : "#db0814"/);
-  assert.match(app, /from "\.\/simulation\.js\?v=11"/);
+  assert.match(app, /from "\.\/simulation\.js\?v=12"/);
+  assert.match(app, /from "\.\/strategy\.js\?v=8"/);
   assert.match(html, /name="theme-color" content="#000000"/);
   assert.match(html, /<title>EISENHERZ<\/title>/);
   assert.match(html, /<link rel="icon" href="\.\/assets\/icon\/icon\.ico" sizes="any">/);
-  assert.match(html, /href="\.\/styles\.css\?v=31"/);
-  assert.match(html, /src="\.\/src\/app\.js\?v=94"/);
+  assert.match(html, /href="\.\/styles\.css\?v=34"/);
+  assert.match(html, /src="\.\/src\/app\.js\?v=102"/);
   assert.match(html, /<h1>DEMO<\/h1>/);
   assert.match(html, /<p class="eyebrow">EISENHERZ<\/p>/);
   assert.match(html, /id="loading" class="loading" role="status" aria-live="polite"/);
@@ -86,6 +87,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(html, /id="panel-unit-count">24<\/span>\s*\/ 24/);
   assert.match(html, /id="panel-strength"/);
   assert.match(html, /id="panel-status"/);
+  assert.doesNotMatch(html, /id="activate-v2"|class="special-attack"/);
+  assert.doesNotMatch(app, /\["SONDERWAFFE", "V2ボタン/);
   assert.match(html, /id="battle-result"[^>]*hidden/);
   assert.match(html, /id="result-title"/);
   assert.match(html, /id="result-restart"[^>]*>RESTART BATTLE<\/button>/);
@@ -130,6 +133,8 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(css, /\.strategy-spot-panel\.is-drop-hover\s*\{[^}]*background:\s*var\(--white\)/s);
   assert.match(css, /\.strategy-drag-ghost\s*\{[^}]*position:\s*fixed;[^}]*pointer-events:\s*none/s);
   assert.match(css, /\.strategy-drag-ghost\.is-valid\s*\{[^}]*border-color:\s*var\(--white\)/s);
+  assert.match(css, /\.strategy-sortie-panel\s*\{[^}]*width:\s*min\(390px, calc\(100vw - 28px\)\)/s);
+  assert.match(css, /\.strategy-sortie-units \.formation-units\s*\{[^}]*grid-template-columns:\s*repeat\(8, 58px\)/s);
   assert.match(css, /#begin-battle\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(css, /#confirm-invasion\s*\{[^}]*background:\s*var\(--red\)/s);
   assert.match(app, /const INVASION_DIALOG_FRONT_Z_INDEX = 70/);
@@ -180,6 +185,12 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /const allButton = event\.target\.closest\("\[data-strategy-select-scope='all'\]"\)/);
   assert.match(app, /type: "all",\s*spotId: spot\.id,\s*unitIds: ids/s);
   assert.match(app, /function createStrategyDragGhost\(units\)/);
+  assert.match(app, /function buildStrategySortieUnits\(selectedUnits\) \{[\s\S]*?formations\.has\(unit\.formationId\)[\s\S]*?for \(const unitsInFormation of formations\.values\(\)\)/);
+  assert.match(app, /function strategyVisuallySelectedUnitIds\(spotId\)/);
+  assert.match(app, /const allSelected = nextIds\.length > 0 && nextIds\.every\(id =>[\s\S]*?state\.strategy\.selectedUnitIds\.delete\(id\);/);
+  assert.match(app, /const dragUnitIds = startsOnSelectedUnit\s*\? visuallySelectedIds\s*:\s*clickToggle\?\.unitIds \?\? \[\];/);
+  assert.match(app, /if \(!drag\.moved\) \{[\s\S]*?toggleStrategyUnitHighlight\(clickToggle\.spotId, clickToggle\.unitIds \?\? \[\], additive\);/);
+  assert.match(app, /commitStrategyForceDragSelection\(clickToggle\.spotId, unitIds, additive\);/);
   assert.match(app, /if \(event\.target\.closest\?\.\("button"\)\) return;/);
   assert.match(app, /function placeHudPanel\(panel, clientLeft, clientTop\)/);
   assert.match(app, /function stopPanelDragFromControlButton\(event\)/);
@@ -228,7 +239,7 @@ test("the interface follows the black red and white design system", async () => 
   assert.match(app, /if \(!additive && isEntireGroupSelected\(nextIds\)\)/);
   assert.match(app, /ctx\.rotate\(Math\.atan2\(dy, dx\) \+ Math\.PI\)/);
   assert.match(app, /if \(!state\.started\) \{\s*if \(event\.code === "Enter"\) \{\s*event\.preventDefault\(\);\s*startBattle\(\);/s);
-  assert.match(app, /if \(state\.mode === "battle" && state\.started && !state\.paused\) updateBattle/);
+  assert.match(app, /else if \(state\.mode === "battle" && state\.started && !state\.paused\) \{\s*updateBattle/);
   assert.match(app, /!isStrategyMapMode\(\) &&\s*\(!state\.started \|\| state\.battle\?\.winner\)/);
   assert.doesNotMatch(app, /!isStrategyMapMode\(\) &&\s*\(!state\.started \|\| state\.paused/);
   assert.match(app, /pauseButton\.textContent = state\.paused \? "RESUME" : "PAUSE"/);

@@ -1,4 +1,5 @@
 import {
+  applyV2Strike,
   clearFireTarget,
   clearMoveOrders,
   createBattle,
@@ -7,7 +8,7 @@ import {
   setAllyControlMode,
   teamCounts,
   updateBattle,
-} from "./simulation.js?v=11";
+} from "./simulation.js?v=12";
 import {
   CAMERA_LIMITS,
   cameraTransform,
@@ -42,7 +43,7 @@ import {
   isStrategyUnitActionAvailable,
   resolveStrategyBattle,
   selectedStrategyUnits as getSelectedStrategyUnits,
-} from "./strategy.js?v=7";
+} from "./strategy.js?v=8";
 
 const canvas = document.getElementById("battlefield");
 const ctx = canvas.getContext("2d");
@@ -80,6 +81,7 @@ const zoomLevel = document.getElementById("zoom-level");
 const panelUnitCount = document.getElementById("panel-unit-count");
 const panelStrength = document.getElementById("panel-strength");
 const panelStatus = document.getElementById("panel-status");
+const v2Button = document.getElementById("activate-v2");
 const battleResult = document.getElementById("battle-result");
 const resultTitle = document.getElementById("result-title");
 const resultAllies = document.getElementById("result-allies");
@@ -228,6 +230,8 @@ const ASSET_URLS = {
   enemy: "./assets/unit/sov1.webp",
   shell: "./assets/effect/tank_gun.webp",
   artilleryShell: "./assets/effect/grenades.webp",
+  v2Rocket: "./assets/effect/v2.webp",
+  v2Cutin: "./assets/cutin/cutin2.webp",
 };
 const STRATEGY_ASSET_URLS = {
   world: "./assets/world/world.webp",
@@ -253,6 +257,11 @@ const ARTILLERY_SHELL_HALF_SIZE = ARTILLERY_SHELL_SIZE / 2;
 const EXPLOSION_SIZE = 176;
 const EXPLOSION_HALF_SIZE = EXPLOSION_SIZE / 2;
 const EXPLOSION_FRAME_COUNT = 9;
+const V2_CUTIN_END = 1.15;
+const V2_WARNING_END = 2.25;
+const V2_ROCKET_END = 3.15;
+const V2_EFFECT_END = 4.35;
+const V2_BLAST_RADIUS = 320;
 const HP_BAR_WIDTH = 96;
 const SPOT_SIZE = 72;
 const SPOT_HIT_RADIUS = 48;
@@ -311,6 +320,7 @@ const state = {
   panelSelectionDrag: null,
   externalPanelSelectionDrag: null,
   strategyPanelSelectionDrag: null,
+  strategyHighlightedUnitIds: new Set(),
   strategySortiePanel: null,
   strategyFactionPanels: new Map(),
   commandDrag: null,
@@ -333,6 +343,9 @@ const state = {
   strategyEffectStartedAt: 0,
   strategyTintedSpotImages: new WeakMap(),
   lastScenarioLoadingArtIndex: -1,
+  v2Used: false,
+  v2Targeting: false,
+  v2Effect: null,
 };
 let controlsReturnButton = showControlsButton;
 
@@ -380,6 +393,7 @@ async function boot() {
   formationLineButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   formationSquareButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
   formationDenseButton.addEventListener("pointerdown", stopPanelDragFromControlButton);
+  v2Button?.addEventListener("pointerdown", stopPanelDragFromControlButton);
   controlHoldButton.addEventListener("click", event => {
     event.stopPropagation();
     setControlMode("hold");
@@ -400,6 +414,7 @@ async function boot() {
     event.stopPropagation();
     setFormationStyle("dense");
   });
+  v2Button?.addEventListener("click", beginV2Targeting);
   resultRestartButton.addEventListener("click", () => {
     if (state.strategyCleared) {
       runScreenTransition(returnToScenarioScreen);
@@ -829,6 +844,7 @@ function closeStrategyTransientUi() {
   if (!state.strategy) return;
   cancelStrategyPanelSelection();
   cancelStrategyForceDrag();
+  state.strategyHighlightedUnitIds.clear();
   for (const panel of state.strategy.openSpotPanels.values()) panel.remove();
   state.strategy.openSpotPanels.clear();
   closeStrategyFactionInfoPanels();
@@ -994,6 +1010,10 @@ function resetBattle(options = {}) {
   state.battle.explosions ??= [];
   state.started = !options.waitForStart;
   state.paused = false;
+  state.v2Used = false;
+  state.v2Targeting = false;
+  state.v2Effect = null;
+  canvas.classList.remove("is-v2-targeting");
   state.selectedUnitIds.clear();
   state.selectionDrag = null;
   state.panelSelectionDrag = null;
@@ -1125,15 +1145,17 @@ function renderControlsGuide(mode) {
 }
 
 function togglePause() {
-  if (state.transitioning) return;
+  if (state.transitioning || state.v2Effect) return;
   if (state.mode === "strategy") {
     openEndTurnDialog();
     return;
   }
   if (!state.started || state.battle?.winner) return;
+  if (state.v2Targeting) cancelV2Targeting();
   state.paused = !state.paused;
   syncPauseButton();
   syncBattleClock();
+  syncV2Button();
 }
 
 function openEndTurnDialog() {
@@ -1154,7 +1176,7 @@ function cancelEndTurn() {
 
 function syncPauseButton() {
   pauseButton.textContent = state.paused ? "RESUME" : "PAUSE";
-  pauseButton.disabled = !state.started || Boolean(state.battle?.winner);
+  pauseButton.disabled = !state.started || Boolean(state.battle?.winner) || Boolean(state.v2Effect);
   pauseButton.classList.toggle("is-active", state.paused);
   pauseButton.setAttribute("aria-pressed", String(state.paused));
 }
@@ -1314,7 +1336,9 @@ function handleKeyboard(event) {
   if (event.code === "Escape") {
     if (event.target.matches?.("input, textarea, select, [contenteditable='true']")) return;
     event.preventDefault();
-    if (state.mode === "strategy") {
+    if (state.v2Targeting) {
+      cancelV2Targeting();
+    } else if (state.mode === "strategy") {
       clearStrategySelection();
     } else {
       selectUnitIds([]);
@@ -1337,8 +1361,12 @@ function handleKeyboard(event) {
 function frame(now) {
   const delta = Math.min((now - state.lastTime) / 1000, 0.1);
   state.lastTime = now;
-  if (state.mode === "battle" && state.started && !state.paused) updateBattle(state.battle, delta);
-  updateCamera(delta);
+  if (state.v2Effect) {
+    updateV2Effect(delta);
+  } else if (state.mode === "battle" && state.started && !state.paused) {
+    updateBattle(state.battle, delta);
+  }
+  if (!state.v2Effect && !state.v2Targeting) updateCamera(delta);
   syncStrategyHover();
   if (isStrategyMapMode()) {
     state.strategyEffectTime = now;
@@ -1382,6 +1410,7 @@ function render() {
     drawCommandPreview();
   }
   ctx.restore();
+  if (state.v2Effect) drawV2ScreenEffect(width, height);
 }
 
 function strategyRenderKey(width, height) {
@@ -1606,6 +1635,220 @@ function drawBattle() {
   }
   for (const shell of state.battle.shells) drawShell(shell);
   for (const explosion of state.battle.explosions ?? []) drawExplosion(explosion);
+  if (state.v2Effect) drawV2WorldEffect(state.v2Effect);
+}
+
+function drawV2WorldEffect(effect) {
+  if (effect.age < V2_CUTIN_END) return;
+  const warningProgress = Math.min(
+    1,
+    Math.max(0, (effect.age - V2_CUTIN_END) / (V2_WARNING_END - V2_CUTIN_END))
+  );
+
+  if (effect.age < V2_ROCKET_END) {
+    drawV2Warning(effect.x, effect.y, warningProgress, effect.age);
+  }
+  if (effect.age >= V2_WARNING_END && effect.age < V2_ROCKET_END) {
+    const progress = (effect.age - V2_WARNING_END) / (V2_ROCKET_END - V2_WARNING_END);
+    drawV2Rocket(effect.x, effect.y, progress);
+  }
+  if (effect.age >= V2_ROCKET_END) {
+    drawV2Explosion(effect.x, effect.y, effect.age - V2_ROCKET_END);
+  }
+}
+
+function drawV2Warning(x, y, progress, age) {
+  const pulse = 0.82 + Math.sin(age * Math.PI * 8) * 0.12;
+  const radius = V2_BLAST_RADIUS * (1.18 - progress * 0.18);
+  ctx.save();
+  ctx.globalAlpha = 0.16 + progress * 0.16;
+  ctx.fillStyle = "#db0814";
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = "#ff1824";
+  ctx.lineWidth = 8;
+  ctx.setLineDash([34, 18]);
+  ctx.lineDashOffset = -age * 90;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(x, y, 76 + Math.sin(age * 10) * 10, 0, Math.PI * 2);
+  ctx.moveTo(x - radius - 70, y);
+  ctx.lineTo(x + radius + 70, y);
+  ctx.moveTo(x, y - radius - 70);
+  ctx.lineTo(x, y + radius + 70);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawV2Rocket(x, y, progress) {
+  const eased = progress * progress * progress;
+  const size = 470 + eased * 150;
+  const rocketY = y - 980 * (1 - eased);
+  const trailLength = 560 * (1 - progress * 0.35);
+  const gradient = ctx.createLinearGradient(x, rocketY - trailLength, x, rocketY - 120);
+  gradient.addColorStop(0, "rgba(40, 40, 40, 0)");
+  gradient.addColorStop(0.6, "rgba(45, 45, 45, 0.72)");
+  gradient.addColorStop(1, "rgba(255, 38, 18, 0.92)");
+  ctx.save();
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.moveTo(x - 62, rocketY - 90);
+  ctx.lineTo(x - 145, rocketY - trailLength);
+  ctx.lineTo(x + 145, rocketY - trailLength);
+  ctx.lineTo(x + 62, rocketY - 90);
+  ctx.closePath();
+  ctx.fill();
+  ctx.translate(x, rocketY);
+  ctx.rotate(Math.PI);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(state.images.v2Rocket, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+function drawV2Explosion(x, y, elapsed) {
+  const progress = Math.min(1, elapsed / (V2_EFFECT_END - V2_ROCKET_END));
+  const flash = Math.max(0, 1 - elapsed / 0.22);
+  const shockRadius = 80 + 620 * Math.min(1, elapsed / 0.72);
+  ctx.save();
+  if (flash > 0) {
+    ctx.globalAlpha = flash;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(x, y, 160 + 380 * (1 - flash), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "lighter";
+  const fire = ctx.createRadialGradient(x, y, 0, x, y, 330 * (0.72 + progress * 0.28));
+  fire.addColorStop(0, "rgba(255,255,255,0.95)");
+  fire.addColorStop(0.2, "rgba(255,225,80,0.9)");
+  fire.addColorStop(0.55, "rgba(255,45,10,0.75)");
+  fire.addColorStop(1, "rgba(95,0,0,0)");
+  ctx.fillStyle = fire;
+  ctx.beginPath();
+  ctx.arc(x, y, 350, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = Math.max(0, 1 - progress);
+  ctx.strokeStyle = "#fff4d2";
+  ctx.lineWidth = 34 * (1 - progress) + 4;
+  ctx.beginPath();
+  ctx.arc(x, y, shockRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawV2ScreenEffect(width, height) {
+  const effect = state.v2Effect;
+  if (!effect) return;
+  ctx.save();
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  if (effect.age < V2_CUTIN_END) {
+    const progress = Math.min(1, effect.age / 0.32);
+    const exit = Math.max(0, (effect.age - 0.88) / (V2_CUTIN_END - 0.88));
+    const imageSize = Math.min(height * 1.05, 900);
+    const imageX = width - imageSize + (1 - progress + exit) * imageSize;
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.72 * (1 - exit)})`;
+    ctx.fillRect(0, 0, width, height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(width * 0.28, 0);
+    ctx.lineTo(width, 0);
+    ctx.lineTo(width, height);
+    ctx.lineTo(width * 0.12, height);
+    ctx.closePath();
+    ctx.clip();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(state.images.v2Cutin, imageX, (height - imageSize) / 2, imageSize, imageSize);
+    ctx.restore();
+    ctx.globalAlpha = 1 - exit;
+    ctx.fillStyle = "#db0814";
+    ctx.fillRect(0, height * 0.66, width, Math.max(8, height * 0.018));
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `900 ${Math.max(24, Math.min(62, width * 0.052))}px Arial Black, sans-serif`;
+    ctx.textBaseline = "bottom";
+    ctx.fillText("VERGELTUNGSWAFFE 2", Math.max(24, width * 0.045), height * 0.64);
+    ctx.fillStyle = "#db0814";
+    ctx.font = `900 ${Math.max(12, Math.min(20, width * 0.016))}px Arial, sans-serif`;
+    ctx.fillText("SONDERBEFEHL // ZIEL ERFASST", Math.max(26, width * 0.048), height * 0.7);
+  }
+  if (effect.age >= V2_ROCKET_END && effect.age < V2_ROCKET_END + 0.16) {
+    ctx.globalAlpha = 1 - (effect.age - V2_ROCKET_END) / 0.16;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.restore();
+}
+
+function beginV2Targeting(event) {
+  event?.stopPropagation();
+  if (state.v2Targeting) {
+    cancelV2Targeting();
+    return;
+  }
+  if (
+    state.mode !== "battle" ||
+    !state.started ||
+    state.paused ||
+    state.v2Used ||
+    state.v2Effect ||
+    state.battle?.winner
+  ) return;
+  state.v2Targeting = true;
+  canvas.classList.add("is-v2-targeting");
+  v2Button.classList.add("is-targeting");
+  v2Button.textContent = "SELECT TARGET";
+}
+
+function cancelV2Targeting() {
+  state.v2Targeting = false;
+  canvas.classList.remove("is-v2-targeting");
+  v2Button.classList.remove("is-targeting");
+  syncV2Button();
+}
+
+function launchV2At(x, y) {
+  state.v2Targeting = false;
+  state.v2Used = true;
+  state.v2Effect = { x, y, age: 0, impacted: false };
+  canvas.classList.remove("is-v2-targeting");
+  v2Button.classList.remove("is-targeting");
+  clearFireTarget(state.battle);
+  syncV2Button();
+  syncPauseButton();
+}
+
+function updateV2Effect(delta) {
+  const effect = state.v2Effect;
+  if (!effect) return;
+  effect.age += delta;
+  if (!effect.impacted && effect.age >= V2_ROCKET_END) {
+    effect.impacted = true;
+    applyV2Strike(state.battle, effect.x, effect.y);
+    updateHud();
+  }
+  if (effect.age < V2_EFFECT_END) return;
+  state.v2Effect = null;
+  updateHud();
+}
+
+function syncV2Button() {
+  if (!v2Button) return;
+  const unavailable =
+    state.mode !== "battle" ||
+    !state.started ||
+    state.paused ||
+    state.v2Used ||
+    Boolean(state.v2Effect) ||
+    Boolean(state.battle?.winner);
+  v2Button.disabled = unavailable;
+  if (state.v2Targeting) return;
+  v2Button.textContent = state.v2Used ? "V2 // EXPENDED" : "V2 // READY";
 }
 
 function drawCommandPreview() {
@@ -1985,6 +2228,10 @@ function zoomWithWheel(event) {
     event.preventDefault();
     return;
   }
+  if (state.v2Effect || state.v2Targeting) {
+    event.preventDefault();
+    return;
+  }
   event.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const factor = Math.exp(-event.deltaY * 0.0015);
@@ -1996,12 +2243,20 @@ function startGestureZoom(event) {
     event.preventDefault();
     return;
   }
+  if (state.v2Effect || state.v2Targeting) {
+    event.preventDefault();
+    return;
+  }
   event.preventDefault();
   state.gestureScale = state.camera.scale;
 }
 
 function changeGestureZoom(event) {
   if (isStrategyMapMode()) {
+    event.preventDefault();
+    return;
+  }
+  if (state.v2Effect || state.v2Targeting) {
     event.preventDefault();
     return;
   }
@@ -2050,10 +2305,15 @@ function updateHud() {
   updateBattleResult(counts);
   syncPauseButton();
   syncBattleClock();
+  syncV2Button();
 }
 
 function updateBattleResult(counts) {
   const winner = state.battle.winner;
+  if (state.v2Effect) {
+    battleResult.hidden = true;
+    return;
+  }
   if (!winner) {
     battleResult.hidden = true;
     return;
@@ -2528,13 +2788,15 @@ function buildStrategySortieUnits(selectedUnits) {
 
   const roleGroups = new Map();
   for (const unit of selectedUnits) {
-    if (!roleGroups.has(unit.role)) roleGroups.set(unit.role, []);
-    roleGroups.get(unit.role).push(unit);
+    if (!roleGroups.has(unit.role)) roleGroups.set(unit.role, new Map());
+    const formations = roleGroups.get(unit.role);
+    if (!formations.has(unit.formationId)) formations.set(unit.formationId, []);
+    formations.get(unit.formationId).push(unit);
   }
 
   for (const role of ["frontline", "rearGuard"]) {
-    const units = roleGroups.get(role);
-    if (!units?.length) continue;
+    const formations = roleGroups.get(role);
+    if (!formations?.size) continue;
 
     const roleGroup = document.createElement("section");
     roleGroup.className = "role-group";
@@ -2542,24 +2804,27 @@ function buildStrategySortieUnits(selectedUnits) {
 
     const heading = document.createElement("h3");
     heading.className = "role-heading";
-    heading.innerHTML = `<span>${ROLE_LABELS[role]}</span><b>${units.length}</b>`;
+    heading.innerHTML = `<span>${ROLE_LABELS[role]}</span><b>${[...formations.values()].flat().length}</b>`;
     roleGroup.append(heading);
 
-    const row = document.createElement("div");
-    row.className = "formation-row";
+    for (const unitsInFormation of formations.values()) {
+      const row = document.createElement("div");
+      row.className = "formation-row";
+      row.dataset.formationId = unitsInFormation[0].formationId;
 
-    const label = document.createElement("div");
-    label.className = "strategy-formation-label";
-    label.textContent = "SORTIE";
+      const label = document.createElement("div");
+      label.className = "strategy-formation-label";
+      label.textContent = TYPE_LABELS[unitsInFormation[0].type] ?? "FORMATION";
 
-    const unitList = document.createElement("div");
-    unitList.className = "formation-units";
-    for (const unit of units) {
-      unitList.append(createStrategySortieUnitCard(unit));
+      const unitList = document.createElement("div");
+      unitList.className = "formation-units";
+      for (const unit of unitsInFormation) {
+        unitList.append(createStrategySortieUnitCard(unit));
+      }
+
+      row.append(label, unitList);
+      roleGroup.append(row);
     }
-
-    row.append(label, unitList);
-    roleGroup.append(row);
     body.append(roleGroup);
   }
   return body;
@@ -2727,7 +2992,7 @@ function buildStrategySpotUnits(spot) {
         const ids = unitsInFormation
           .filter(unit => canSelectStrategyUnit(unit))
           .map(unit => unit.id);
-        label.classList.toggle("is-selected", isEntireStrategyGroupSelected(ids));
+        label.classList.toggle("is-selected", isEntireStrategyGroupVisuallySelected(ids));
         label.disabled = ids.length === 0;
       }
       label.textContent = TYPE_LABELS[unitsInFormation[0].type] ?? "FORMATION";
@@ -2763,7 +3028,7 @@ function buildStrategyUnitSelectionActions(spot, availableUnitIds) {
   allButton.type = "button";
   allButton.dataset.strategySelectScope = "all";
   allButton.dataset.spotId = spot.id;
-  allButton.classList.toggle("is-selected", isEntireStrategyGroupSelected(availableUnitIds));
+  allButton.classList.toggle("is-selected", isEntireStrategyGroupVisuallySelected(availableUnitIds));
   allButton.disabled = availableUnitIds.length === 0;
   allButton.textContent = "ALL UNITS";
 
@@ -2798,7 +3063,10 @@ function createStrategyUnitCard(unit, selectable) {
     );
     if (!canSelect) card.title = "次のターンまで出撃できません";
   }
-  card.classList.toggle("is-selected", state.strategy.selectedUnitIds.has(unit.id));
+  card.classList.toggle(
+    "is-selected",
+    state.strategy.selectedUnitIds.has(unit.id) || state.strategyHighlightedUnitIds.has(unit.id)
+  );
   card.classList.toggle("is-destroyed", !unit.alive);
   card.classList.toggle("is-waiting", unit.alive && !isStrategyUnitActionAvailable(state.strategy, unit));
 
@@ -2976,6 +3244,8 @@ function closeStrategySpotPanel(spotId) {
   }
   if (!state.strategy.selectedTargetId) {
     removeSelectedStrategyUnitsFromSpot(spotId);
+    const spot = strategySpot(spotId);
+    for (const unit of spot?.units ?? []) state.strategyHighlightedUnitIds.delete(unit.id);
   }
   if (closesTargetPanel) {
     state.strategy.selectedTargetId = null;
@@ -3002,7 +3272,7 @@ function handleStrategyUnitSelection(button, additive = true) {
   const unit = spot.units.find(candidate => candidate.id === button.dataset.strategyUnit);
   if (!unit || !canSelectStrategyUnit(unit)) return;
 
-  toggleStrategyUnitSelection(spot.id, [unit.id], additive);
+  toggleStrategyUnitHighlight(spot.id, [unit.id], additive);
 }
 
 function toggleStrategySelectionBy(spotId, predicate, additive = true) {
@@ -3011,31 +3281,42 @@ function toggleStrategySelectionBy(spotId, predicate, additive = true) {
   const ids = spot.units
     .filter(unit => canSelectStrategyUnit(unit) && predicate(unit))
     .map(unit => unit.id);
-  toggleStrategyUnitSelection(spot.id, ids, additive);
+  toggleStrategyUnitHighlight(spot.id, ids, additive);
 }
 
 function toggleStrategyFormationSelection(spotId, formationId) {
   const spot = strategySpot(spotId);
   if (!spot || !canSelectStrategySpotUnits(spot)) return;
-  if (!state.strategy.selectedTargetId && state.strategy.selectedSourceId !== spot.id) {
-    state.strategy.selectedUnitIds.clear();
-    state.strategy.selectedSourceId = spot.id;
-  }
-  state.strategy.selectedSourceId = spot.id;
-
   const ids = spot.units
     .filter(unit => canSelectStrategyUnit(unit) && unit.formationId === formationId)
     .map(unit => unit.id);
   if (ids.length === 0) return;
 
-  if (isEntireStrategyGroupSelected(ids)) {
-    for (const id of ids) state.strategy.selectedUnitIds.delete(id);
-  } else {
-    addStrategyUnitIdsWithinLimit(ids);
-  }
+  toggleStrategyUnitHighlight(spot.id, ids, true);
+}
 
+function toggleStrategyUnitHighlight(spotId, ids, additive = true) {
+  const spot = strategySpot(spotId);
+  if (!spot || !canSelectStrategySpotUnits(spot)) return;
+  const eligible = new Set(spot.units.filter(unit => canSelectStrategyUnit(unit)).map(unit => unit.id));
+  const nextIds = ids.filter(id => eligible.has(id));
+  const allSelected = nextIds.length > 0 && nextIds.every(id =>
+    state.strategy.selectedUnitIds.has(id) || state.strategyHighlightedUnitIds.has(id)
+  );
+  if (!additive) state.strategyHighlightedUnitIds.clear();
+  if (allSelected) {
+    for (const id of nextIds) {
+      state.strategyHighlightedUnitIds.delete(id);
+      state.strategy.selectedUnitIds.delete(id);
+    }
+  } else {
+    for (const id of nextIds) {
+      if (!state.strategy.selectedUnitIds.has(id)) state.strategyHighlightedUnitIds.add(id);
+    }
+  }
   state.strategy.selectedSpotId = spot.id;
-  state.strategy.message = strategySelectionMessage();
+  state.strategy.selectedSourceId = spot.id;
+  state.strategy.message = STRATEGY_MESSAGE_DRAG_UNITS;
   updateStrategyHud();
   updateStrategySpotPanels();
 }
@@ -3077,6 +3358,12 @@ function toggleStrategyUnitSelection(spotId, ids, additive = true) {
 
 function isEntireStrategyGroupSelected(ids) {
   return ids.length > 0 && ids.every(id => state.strategy.selectedUnitIds.has(id));
+}
+
+function isEntireStrategyGroupVisuallySelected(ids) {
+  return ids.length > 0 && ids.every(id =>
+    state.strategy.selectedUnitIds.has(id) || state.strategyHighlightedUnitIds.has(id)
+  );
 }
 
 function selectStrategyUnitIds(spotId, ids, additive = false) {
@@ -3359,13 +3646,13 @@ function finishStrategyPanelSelection(event) {
       drag.currentClientX,
       drag.currentClientY
     );
-    selectStrategyUnitIds(
+    toggleStrategyUnitHighlight(
       drag.spotId,
       strategyUnitCardsInClientBounds(drag.panel, bounds),
       drag.additive
     );
   } else {
-    selectStrategyUnitIds(drag.spotId, drag.unitId ? [drag.unitId] : [], drag.additive);
+    toggleStrategyUnitHighlight(drag.spotId, drag.unitId ? [drag.unitId] : [], drag.additive);
   }
   state.suppressPanelClick = true;
   setTimeout(() => {
@@ -3650,6 +3937,8 @@ function startCommandDrag(event) {
   if (
     state.mode !== "battle" ||
     !state.started ||
+    state.v2Targeting ||
+    state.v2Effect ||
     state.battle?.winner ||
     !battleResult.hidden ||
     state.selectedUnitIds.size === 0
@@ -3739,14 +4028,24 @@ function selectedLivingAllies() {
 function startStrategyForceDrag(event, captureElement = strategySelectedForces, clickToggle = null) {
   if (event.button !== 0 || state.mode !== "strategy" || state.strategy.phase !== "player") return;
   const units = selectedStrategyUnits();
+  const visuallySelectedIds = clickToggle
+    ? strategyVisuallySelectedUnitIds(clickToggle.spotId)
+    : units.map(unit => unit.id);
+  const startsOnSelectedUnit = !clickToggle || (clickToggle.unitIds ?? []).some(id =>
+    visuallySelectedIds.includes(id)
+  );
+  const dragUnitIds = startsOnSelectedUnit
+    ? visuallySelectedIds
+    : clickToggle?.unitIds ?? [];
   const dragUnits = clickToggle
-    ? strategyUnitsByIds(clickToggle.spotId, clickToggle.unitIds ?? [])
+    ? strategyUnitsByIds(clickToggle.spotId, dragUnitIds)
     : units;
-  if (dragUnits.length === 0) return;
+  if (dragUnits.length === 0 && !clickToggle) return;
   state.strategyForceDrag = {
     pointerId: event.pointerId,
     captureElement,
     clickToggle,
+    dragUnitIds,
     previousSelectedUnitIds: new Set(state.strategy.selectedUnitIds),
     startClientX: event.clientX,
     startClientY: event.clientY,
@@ -3763,6 +4062,17 @@ function startStrategyForceDrag(event, captureElement = strategySelectedForces, 
   }
   clearEdgeScroll();
   event.preventDefault();
+}
+
+function strategyVisuallySelectedUnitIds(spotId) {
+  const spot = strategySpot(spotId);
+  if (!spot) return [];
+  return spot.units
+    .filter(unit =>
+      canSelectStrategyUnit(unit) &&
+      (state.strategy.selectedUnitIds.has(unit.id) || state.strategyHighlightedUnitIds.has(unit.id))
+    )
+    .map(unit => unit.id);
 }
 
 function updateStrategyForceDrag(event) {
@@ -3795,7 +4105,7 @@ function updateStrategyForceDrag(event) {
 
 function strategyForceDragUnits(drag) {
   if (drag.clickToggle) {
-    return strategyUnitsByIds(drag.clickToggle.spotId, drag.clickToggle.unitIds ?? []);
+    return strategyUnitsByIds(drag.clickToggle.spotId, drag.dragUnitIds ?? []);
   }
   return selectedStrategyUnits();
 }
@@ -3832,15 +4142,16 @@ function finishStrategyForceDrag(event) {
     const clickToggle = drag.clickToggle;
     cancelStrategyForceDrag(event);
     if (clickToggle) {
-      state.strategy.message = STRATEGY_MESSAGE_DRAG_UNITS;
-      updateStrategyHud();
+      const additive = state.strategy.selectedTargetId ? true : clickToggle.type !== "all";
+      toggleStrategyUnitHighlight(clickToggle.spotId, clickToggle.unitIds ?? [], additive);
     }
     suppressNextStrategyPanelClick();
     event.preventDefault();
     return;
   }
-  const sortiePanel = strategySortiePanelAt(event);
-  const dropExceedsLimit = Boolean(sortiePanel && wouldCurrentStrategyForceDropExceedLimit(event));
+  const hoveredSortiePanel = strategySortiePanelAt(event);
+  const dropExceedsLimit = Boolean(hoveredSortiePanel && wouldCurrentStrategyForceDropExceedLimit(event));
+  const sortiePanel = dropExceedsLimit ? null : strategySortieDropPanelAt(event);
   const previousSelectedUnitIds = drag.previousSelectedUnitIds;
   const clickToggle = drag.clickToggle;
   cancelStrategyForceDrag(event);
@@ -3855,9 +4166,10 @@ function finishStrategyForceDrag(event) {
   }
   if (sortiePanel) {
     if (clickToggle) {
-      const unitIds = clickToggle.unitIds ?? [];
+      const unitIds = drag.dragUnitIds ?? [];
       const additive = state.strategy.selectedTargetId ? true : clickToggle.type !== "all";
       commitStrategyForceDragSelection(clickToggle.spotId, unitIds, additive);
+      for (const id of unitIds) state.strategyHighlightedUnitIds.delete(id);
     }
     state.strategy.message = strategySelectionMessage();
     updateStrategyHud();
@@ -3952,7 +4264,7 @@ function strategySortiePanelAt(event) {
 function strategyForceDragUnitCount(event) {
   const drag = state.strategyForceDrag;
   if (drag?.pointerId === event.pointerId && drag.clickToggle) {
-    return drag.clickToggle.unitIds?.length ?? 0;
+    return drag.dragUnitIds?.length ?? 0;
   }
   return selectedStrategyUnits().length;
 }
@@ -3963,7 +4275,7 @@ function wouldCurrentStrategyForceDropExceedLimit(event) {
   const additive = state.strategy.selectedTargetId ? true : drag.clickToggle.type !== "all";
   return wouldStrategyForceDropExceedLimit(
     drag.clickToggle.spotId,
-    drag.clickToggle.unitIds ?? [],
+    drag.dragUnitIds ?? [],
     additive
   );
 }
@@ -4036,6 +4348,14 @@ function startMapSelection(event) {
     state.battle?.winner ||
     !battleResult.hidden
   ) return;
+  if (state.v2Effect) return;
+  if (state.v2Targeting) {
+    const point = canvasPoint(event);
+    const world = screenToWorld(point.x, point.y);
+    launchV2At(world.x, world.y);
+    event.preventDefault();
+    return;
+  }
   const point = canvasPoint(event);
   state.selectionDrag = {
     pointerId: event.pointerId,
@@ -4434,6 +4754,7 @@ function clearStrategySelection() {
   state.strategy.selectedSourceId = null;
   state.strategy.selectedTargetId = null;
   state.strategy.selectedUnitIds.clear();
+  state.strategyHighlightedUnitIds.clear();
   state.pendingOperation = null;
   invasionDialog.hidden = true;
   strategyWarningDialog.hidden = true;
